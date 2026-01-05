@@ -1,0 +1,843 @@
+<style>
+    /* [v-cloak] 是 Vue.js 的一个特殊属性，防止页面加载慢时看到花括号代码，这里主要是为了防闪烁 */
+    [v-cloak] { display: none; }
+    /* 1. 悬浮按钮的样式 */
+    #ai-button {
+        position: fixed;/* ⭐️ 关键：固定定位。不管页面怎么滚动，它都死死钉在屏幕右下角 */
+         bottom: 30px;  /* 距离底部 30像素 */
+         right: 30px;   /* 距离右边 30像素 */
+        width: 70px;
+        height: 70px;
+
+        background: none;   /* 没有背景色 */
+        border: none;   /* 没有边框 */
+        border-radius: 0;
+        box-shadow: none;
+
+        cursor: grab;   /* 鼠标放上去变成一只“张开的手”，暗示可以抓取 */
+        z-index: 9998;  /* ⭐️ 层级：数字越大越靠上。防止被网页其他图片遮住 */
+        user-select: none;
+        transition: transform 0.2s ease-out;    /* 动画：当形状改变时，花 0.2秒平滑过渡 */
+    }
+
+    /* 2. SVG 图标容器 (画出猫咪) */
+    #ai-button svg.ai-cat-icon {
+        position: absolute; /* position: absolute 让图标相对于父元素(#ai-button)定位 */
+        width: 100px; /* SVG 画布比按钮大 */
+        height: 100px;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        /* transform: translateX(-50%) 是居中的经典写法，把元素往左挪自己宽度的一半 */
+        overflow: visible;
+
+        /* ⭐️ 关键：让点击穿透 SVG，点到下面的 #ai-button */
+        /* ⭐️ 重点知识：pointer-events */
+        /* none 表示鼠标点击这个图标时，浏览器会忽略它，直接点到它下面的按钮上。
+           这样做的目的是：不管点猫的哪里，都能触发按钮的拖拽逻辑。 */
+        pointer-events: none;
+        /*视觉上：你能看到猫。
+        交互上：猫变成了透明的幽灵。当你点击猫脸时，鼠标点击会穿透猫咪，直接点中正下方的 #ai-button。
+        好处：不管你点猫的哪里，程序都认为你点的是按钮，逻辑非常稳。*/
+    }
+
+    /* ⭐️ 关键：为可交互的耳朵和眼睛区域重新启用点击事件 */
+    /*这是“复活术”：它把整只猫变成了幽灵（none），但又单独把耳朵和眼睛设回了实体（auto）。*/
+    /*目的：让你虽然不能拖动猫脸（穿透去拖按钮），但你可以单独去摸耳朵（触发压扁特效）或者摸眼睛（触发眨眼），而不影响整体拖拽。*/
+    #ear-left, #ear-right,
+    #eye-region
+    {
+        pointer-events: auto; /* 这些 SVG 元素可以被单独悬停/点击 */
+    }
+
+    /*
+    1.# (井号): ID 选择器  含义： 用于选中 HTML 或 SVG 中 id="..." 属性的元素。
+    特点： ID 在整个页面中必须是唯一的（就像你的身份证号）。代码对应：
+    CSS: #eye-region
+    HTML/SVG: <g id="eye-region">...</g>
+    2.. (点号): 类 (Class) 选择器    含义： 用于选中 HTML 或 SVG 中 class="..." 属性的元素。
+    特点： Class 可以被多个元素重复使用（就像很多人都可以穿“校服”）。代码对应：
+    CSS: .eyes-open
+    HTML/SVG: <g class="eyes-open">...</g>
+    3.g (字母): 标签 (Type) 选择器  含义： 选中所有的 <g> 标签。
+    在 SVG 中，<g> 代表 "Group"（组），作用类似于 HTML 中的 <div>，用来把一堆图形打包在一起。
+    */
+
+    /* 3. (核心) 眼睛的淡入淡出动画 */
+
+    /* 睁开的眼睛：默认显示 */
+    /*g.eyes-open 是一个组合选择器。
+    意思是： “找到一个元素，它必须同时满足两个条件：1. 它是一个 <g> 标签；2. 它拥有 eyes-open 这个类名。”
+    为什么要加前面的 g？
+    1.增加权重（Specificity）： g.eyes-open 比单纯的 .eyes-open 权重稍微高一点点，能防止被其他简单的规则覆盖。
+    2.增加可读性： 让人一眼看出这个类是专门用在 SVG 的 Group 标签上的，而不是用在别的标签上。*/
+    g.eyes-open {
+        opacity: 1; /*“我是完全可见的”*/
+        /*
+        opacity (不透明度)：用来控制一个元素是“实心的”还是“透明的”。
+        1：完全不透明（实心，看得清清楚楚）。
+        0：完全透明（隐身了，虽然还在那，但看不见）。
+        0.5：半透明（像透过磨砂玻璃看东西）。
+        */
+        transition: opacity 0.2s ease-in-out;   /*“如果我要变，我要变得很丝滑”*/
+        /*
+        如果没有这一句，眼睛的切换就会像“开关灯”一样，瞬间 1 变 0，非常生硬。加上这句，它就变成了“调光灯”，慢慢变暗。
+        opacity (盯着谁？)意思是：只有当 不透明度 发生变化时，我才启动动画。（如果颜色变了，我就不管，直接变）。
+        0.2s (变多久？)意思是：这个变化的过程要持续 0.2 秒。这是一个很快的时间，大概就是一眨眼的功夫，但足够让人感觉“顺滑”而不是“卡顿”。
+        ease-in-out (什么节奏？)意思是：慢进慢出。动画开始时慢一点 -> 中间快一点 -> 结束时慢一点。
+        为什么要这样？ 这样的动作最像现实生活中的物体运动，看起来最自然、不僵硬。
+        */
+    }
+
+    /* 眯起的眼睛：默认隐藏 */
+    g.eyes-closed {
+        opacity: 0; /*看不到，完全透明*/
+        transition: opacity 0.2s ease-in-out;   /*平滑移动*/
+    }
+
+    /* ⭐️ 鼠标悬停在 #eye-region 上时，眼睛眯起来 */
+    #eye-region:hover g.eyes-open {
+        opacity: 0; /* 睁眼图层：隐身 (看不见了) */
+    }
+    #eye-region:hover g.eyes-closed {
+        opacity: 1; /* 闭眼图层：现身 (看见了) */
+    }
+
+    /* ⭐️ 确保当鼠标悬停在耳朵上时，眼睛不眯 (覆盖上面的规则) */
+    #ear-left:hover ~ #eye-region g.eyes-open,
+    #ear-right:hover ~ #eye-region g.eyes-open {
+        opacity: 1; /* 鼠标悬停耳朵时，强制睁开眼睛 */
+    }
+
+    /*
+    为了让那个 ~ (波浪号) 起作用，你的 HTML 代码顺序必须是 耳朵在前，眼睛在后
+    */
+    #ear-left:hover ~ #eye-region g.eyes-closed,
+    #ear-right:hover ~ #eye-region g.eyes-closed {
+        opacity: 0; /* 鼠标悬停耳朵时，眯眼的opacity为0，就是看不见，透明。就是要强制睁眼 */
+    }
+
+
+    /* 4. (核心) V11 - 全新“压平”特效 */
+
+    /* (V11) 移除 @keyframes 动画 */
+
+    #ear-left,
+    #ear-right {
+        /* (V11) 添加 transition，使其恢复时平滑 */
+        transition: transform 0.2s ease-out;
+    }
+
+    #ear-left {
+        /* (V11) 设置变形中心为耳朵根部中心 */
+        transform-origin: 30px 25px; /* (X: (20+40)/2, Y: (31.7+18.4)/2) */
+    }
+    #ear-right {
+        /* (V11) 设置变形中心为耳朵根部中心 */
+        transform-origin: 70px 25px; /* (X: (60+80)/2, Y: (31.7+18.4)/2) */
+    }
+
+    #ear-left:hover {
+        /* (V11) 向下压平，而不是旋转 */
+        /* transform: 变形属性 */
+        /* scaleY(0.7): 在垂直方向(Y轴) 缩放到原来的 70% */
+        transform: scaleY(0.7);
+        cursor: pointer; /* 鼠标变成“小手”，暗示可以点击 */
+    }
+    #ear-right:hover {
+        /* (V11) 向下压平，而不是旋转 */
+        transform: scaleY(0.7);
+        cursor: pointer;
+    }
+
+
+    /* 5. 按钮的激活和整体悬停效果 */
+    #ai-button:active {
+        /* :active 代表鼠标“按下去还没松开”的状态 */
+        cursor: grabbing;   /* 鼠标变成一个“紧握的拳头”，暗示正在抓取 */
+        transform: scale(0.95); /* 整体缩小到 95% */
+    }
+    /* 鼠标悬停在按钮上时，按钮（和图标）放大 */
+    #ai-button:hover {
+        transform: scale(1.1);
+    }
+
+    /* 2. 聊天框的样式 */
+    #ai-chat-box {
+        position: fixed; bottom: 100px; right: 30px;
+        width: 320px; height: 450px;
+        background: linear-gradient(135deg, #ffffff, #eceff1);
+        /*#ffffff：这是 纯白色 的十六进制代码。#eceff1：这是 非常浅的灰蓝色。
+        linear-gradient（线性渐变）把这两个颜色混合，让背景从左上角到右下角，由白色慢慢过渡到浅灰蓝色。*/
+        border-radius: 12px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+        /*0 (水平偏移量) 6px (垂直偏移量) 20px (模糊半径) rgba(0, 0, 0, 0.2) (阴影颜色)
+        0, 0, 0：代表红色、绿色、蓝色都是 0，也就是纯黑色。 0.2：代表透明度（Alpha）。范围是 0（完全透明）到 1（完全不透明）。*/
+        z-index: 9999; /*CSS 中控制元素 “堆叠顺序”，不管网页上还有什么其他东西（图片、文字、菜单），这个元素必须显示在最最最上面，绝对不能被挡住*/
+        display: none;
+        flex-direction: column; /*让内容“竖着排”，如果不写这句，flex 布局默认是横着排（row），那标题、聊天记录和输入框就会挤在同一行*/
+        overflow: hidden; /*溢出部分隐藏 作用：保护“圆角” ;聊天框顶部的 蓝色标题栏 (.ai-chat-header) 是一个直角矩形。凡是那个蓝色标题栏超出圆角边界的尖尖部分，都被切掉了*/
+    }
+
+    /* 3. 聊天框头部 */
+    .ai-chat-header {
+        background: linear-gradient(135deg, #42a5f5, #8e24aa);
+        /*135deg：表示角度是 135 度（从左上角斜向右下角）#42a5f5 (亮蓝)-> #8e24aa (紫罗兰)。*/
+        color: white; /*背景是深色渐变，文字自然要用 白色*/
+         padding: 12px; /*这个蓝色条条的上下左右 四个方向，都塞进去 12像素 的隐形填充物。效果：内容（文字和按钮）就会被向内挤，离边缘有一段距离，看起来就舒服*/
+         font-size: 16px;
+         font-weight: bold;
+        display: flex; /*开启弹性布局模式，让里面的三个东西（历史按钮、标题文字、关闭按钮）横着 排成一行。*/
+        justify-content: space-between; /*把里面的东西两端对齐，中间留出空隙。效果：左边的“历史记录按钮”会被推到最左边，右边的“关闭 X 按钮”会被推到最右边，标题在中间。不需要你手动去算像素距离，自动隔开*/
+        align-items: center;
+        cursor: grab; /*鼠标指针会变成一只 “张开的手掌” (grab)。*/
+    }
+    .ai-chat-header:active { cursor: grabbing; }
+
+    /*“复用样式”:在标题栏里，有 两个 按钮：左边的“历史记录”按钮 (☰)。右边的“关闭”按钮 (×)。*/
+    /* 标题栏小按钮 位置：在聊天框的蓝色标题栏里。长相：没有形状（背景透明），仅仅是一个 白色的符号。
+    背景：透明的 (background: none)，没有边框。 用途：它是“功能键”，用来查看历史或关闭窗口。*/
+    .ai-header-btn {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 20px;
+        cursor: pointer;
+         padding: 0 5px;
+    }
+    #ai-chat-close {
+        font-size: 24px;
+         font-weight: normal;   /* 字体不加粗 */
+    }
+
+    /* 4. 聊天结果区域 */
+    #ai-chat-results {
+        flex-grow: 1; /* 1. 自动填满剩余空间, 聊天框是竖着排（上：标题，中：记录，下：输入框）。标题和输入框的高度是固定的。
+        意思是：“我是中间那块，剩下的所有空白区域，我全包了！” 它像弹簧一样撑开，把输入框挤到底部，把标题顶到顶部。 */
+         overflow-y: auto; /* 2. 内容多了就出滚动条 */
+         padding: 10px; /* 3. 内边距 ,让文字不要贴着屏幕边缘，留点缝隙。*/
+         font-size: 14px; /* 4. 字体大小 */
+    }
+    .ai-message {
+        margin-bottom: 10px; /* 1. 气泡之间的距离 */
+         padding: 8px 12px; /* 2. 气泡内部的距离 */
+          border-radius: 10px; /* 3. 圆角 */
+        max-width: 90%; /* 4. 最大宽度 */
+        word-wrap: break-word; /* 5. 长单词强制换行 */
+    }
+    .ai-message.user {
+        background-color: #42a5f5; /* 1. 背景蓝色 */
+        color: white; /* 2. 文字白色 */
+        margin-left: auto; /* 3. 【核心】往右挤, 浏览器就会想办法把左边的空隙填满。结果：气泡就被推到了最右边。这就是为什么你发的消息总是靠右显示的原理。*/
+        border-bottom-right-radius: 3px; /*模拟气泡的“小尾巴”，暗示这句话是从右边发出来的。*/
+    }
+    .ai-message.assistant {
+        background-color: #fff; /* 1. 背景白色 */
+        color: #333; /* 2. 文字深灰 */
+        margin-right: auto; /* 3. 【核心】往左挤 */
+         border: 1px solid #eee; /* 4. 加个边框 */
+        border-bottom-left-radius: 3px; /* 5. 左下角变尖 */
+    }
+    /*找到所有在 .ai-message（聊天气泡）里面的 <p>（段落）标签,margin: 0;：意思是“把这个段落外部的所有空隙全部清零”
+    把段落默认自带的空隙关掉，让气泡的大小完全由.ai-message 里设定的 padding 来控制。*/
+    .ai-message p { margin: 0; }
+    .ai-movie-card {
+        display: flex; /* 1. 横排布局 */
+         background: #fff; /* 2. 白底 */
+         border-radius: 8px; /* 3. 内边距 */
+        margin-bottom: 10px;
+        padding: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);/*水平，垂直，模糊半径，RGB，透明度*/
+        border: 1px solid #eee;
+    }
+    .ai-movie-card img {
+        width: 60px;
+        height: 90px;
+        border-radius: 4px;
+        margin-right: 10px;
+         object-fit: cover; /*电影海报有的长、有的宽，如果你强制把它们都设为 60x90，图片会变形,作用：这个属性会保持图片的比例，把多余的部分裁掉，填满这个 60x90 的框，保证海报里的人脸不会变形*/
+    }
+    .ai-movie-card-info { font-size: 13px; }
+    .ai-movie-card-info a {
+        font-size: 15px;
+        font-weight: bold;
+        color: #333;
+        text-decoration: none; /* 去掉链接下划线 */
+    }
+    .ai-movie-card-info a:hover {
+        color: #42a5f5; /* 鼠标悬停变蓝 */
+    }
+    .ai-movie-card-info p {
+        margin: 4px 0 0; /* 1. 顶部留点缝隙,只在顶部加 4px 的空隙。防止电影的评分或者年份紧贴着上面的电影标题，稍微拉开一点距离 */
+         color: #666; /* 2. 灰色文字 */
+     }
+
+    /* 5. 底部输入区域 */
+    .ai-chat-input-area {
+        display: flex; /* 1. 横排布局 */
+        border-top: 1px solid #ddd; /* 2. 顶部分割线 */
+        padding: 10px; /* 3. 内边距 */
+    }
+    #ai-chat-input {
+        flex-grow: 1; /* 1. 【核心】自动撑满,除了发送按钮占用的空间外，剩下的宽度我全都要了！” 不管聊天框被拉得多宽，输入框永远会自动变长，填满空白。 */
+        border: 1px solid #ccc; /* 2. 胶囊形状,把方方正正的输入框变成圆润的胶囊形（像手机短信输入框那样）。 */
+         border-radius: 15px;
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+    /* padding: 8px 12px; 是在设置输入框内部的 “内边距”（也就是文字和边框之间的距离）。
+    8px (第一个数字)：代表 上下 的距离。输入框显得“高”一点，文字上下有留白，不会挤在扁扁的框里。
+    12px (第二个数字)：代表 左右 的距离。它让光标不会紧贴着输入框的最左边，而是往里缩进一段距离。*/
+
+    #ai-chat-send {
+        margin-left: 8px; /*margin 是 外边距（物体外部的距离），left 是 左边。发送按钮的左边是 输入框,加了这一句：意思是“离我左边的邻居（输入框）远一点，保持 8 像素的距离”*/
+        border: none; /*border 是 边框，none 是 没有*/
+         background: #42a5f5; /* 1. 默认蓝色 */
+         color: white;
+        padding: 8px 14px; /*给按钮“充气”,内边距。第一个数字 8px 代表上下，第二个数字 14px 代表左右*/
+        border-radius: 15px; /*边框圆角。作用：把矩形的四个尖角磨圆。*/
+        font-size: 14px;
+        cursor: pointer;
+    }
+    #ai-chat-send:hover {
+        background: #1e88e5; /* 2. 悬停变深蓝 */
+    }
+
+    /* 6. 历史记录屏幕样式 */
+    #ai-history-screen {
+        display: none; /*display: none; —— 默认隐身*/
+        flex-direction: column; /*竖着排队 含义：垂直排列。场景：一旦这个界面显示出来后，里面的内容（标题栏、历史列表）像盖楼一样，从上往下 摞起来：最上面是 “聊天历史”标题栏。下面是 历史记录列表。*/
+        height: 100%; /*铺满全屏,高度占满 100%,当它显示时，它会严丝合缝地覆盖在原来的聊天界面上面，完全盖住底下的内容，给用户一种“切换了屏幕”的感觉*/
+    }
+    .ai-history-header {
+        /* (复用 .ai-chat-header 样式) */
+        flex-shrink: 0;
+    }
+    /* flex-shrink: 0【核心】绝不收缩,收缩比例为 0（意思就是完全不缩）“不管空间多挤，不管下面的列表有多长，我的高度一像素都不能少，必须保持原样！”
+        父容器 #ai-history-screen 只有 450px 高。如果不加控制，当下面的列表内容特别多的时候，浏览器为了把所有东西塞进去，
+        可能会试图把上面的标题栏“挤扁”     结果：标题栏永远稳稳地呆在最上面，高度固定，不会变形。 */
+
+    #ai-history-list {
+        flex-grow: 1;   /* 1. 【核心】自动填满剩余空间 */
+        overflow-y: auto;   /* 2. 内容溢出变滚动 */
+         padding: 10px; /* 3. 内边距 */
+    }
+    .ai-history-item {
+        background: #fff; /* 1. 白底 */
+        border: 1px solid #ddd; /* 2. 浅灰边框 */
+        padding: 12px; /* 3. 内边距 */
+        border-radius: 8px; /* 4. 圆角 */
+        margin-bottom: 8px; /* 5. 下间距 */
+        cursor: pointer;
+        font-size: 14px;
+        white-space: nowrap; /* 1. 禁止换行 */
+        overflow: hidden; /* 2. 超出部分切掉 */
+        text-overflow: ellipsis; /* 3. 变成省略号 (...) */
+    }
+    .ai-history-item:hover {
+        background: #f4f4f4; /*当你把鼠标移到这条历史记录上时，把它的背景色变成浅灰色。”*/
+    }
+</style>
+
+    <div id="ai-assistant-app">
+        <div id="ai-button">
+
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="100%"
+            height="100%"
+            viewBox="0 0 100 100"
+            class="ai-cat-icon"
+        >
+            <defs>
+                <linearGradient id="ai-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#42a5f5;" />
+                    <stop offset="100%" style="stop-color:#8e24aa;" />
+                </linearGradient>
+            </defs>
+
+            <circle
+                cx="50"
+                cy="55"
+                r="38"
+                fill="url(#ai-gradient)"
+            />
+
+            <g id="ear-left">
+                <path
+                    d="M 20 31.7 L 15 5 L 40 18.4 A 38 38 0 0 0 20 31.7 Z"
+                    fill="url(#ai-gradient)"
+                />
+            </g>
+
+            <g id="ear-right">
+                <path
+                    d="M 60 18.4 L 85 5 L 80 31.7 A 38 38 0 0 0 60 18.4 Z"
+                    fill="url(#ai-gradient)"
+                />
+            </g>
+
+
+            <g id="eye-region">
+                <g class="eyes-open">
+                    <circle cx="35" cy="50" r="9" fill="black" />
+                    <circle cx="38" cy="45" r="2.5" fill="white" />
+
+                    <circle cx="65" cy="50" r="9" fill="black" />
+                    <circle cx="68" cy="45" r="2.5" fill="white" />
+                </g>
+
+                <g class="eyes-closed">
+                    <path d="M25 53 Q 35 46 45 53" stroke="black" stroke-width="3" fill="none" stroke-linecap="round"/>
+                    <path d="M55 53 Q 65 46 75 53" stroke="black" stroke-width="3" fill="none" stroke-linecap="round"/>
+                </g>
+            </g>
+
+
+            <path id="nose" d="M47 65 L53 65 L50 69 Z" fill="#f8bbd0" />
+
+            <g class="cat-whiskers" stroke="black" stroke-width="1.5" fill="none" stroke-linecap="round">
+                <path d="M15 70 Q 30 72 45 74" />
+                <path d="M12 78 Q 30 79 45 79" />
+                <path d="M15 86 Q 30 85 45 84" />
+
+                <path d="M85 70 Q 70 72 55 74" />
+                <path d="M88 78 Q 70 79 55 79" />
+                <path d="M85 86 Q 70 85 55 84" />
+            </g>
+        </svg>
+        </div>
+    <div id="ai-chat-box">
+        <div id="ai-chat-screen" style="display: flex; flex-direction: column; height: 100%;">
+            <div class="ai-chat-header" id="ai-chat-header">
+                <button id="ai-chat-history-btn" class="ai-header-btn">☰</button>
+                <span>AI 电影助手</span>
+                <span id="ai-chat-close" class="ai-header-btn">×</span>
+            </div>
+            <div id="ai-chat-results">
+                </div>
+            <div class="ai-chat-input-area">
+                <input type="text" id="ai-chat-input" placeholder="输入描述或标签...">
+                <button id="ai-chat-send">发送</button>
+            </div>
+        </div>
+
+        <div id="ai-history-screen">
+            <div class="ai-chat-header ai-history-header">
+                <button id="ai-history-back-btn" class="ai-header-btn">←</button>
+                <span>聊天历史</span>
+                <button id="ai-history-clear-btn" class="ai-header-btn" style="font-size: 14px;">清空</button>
+            </div>
+            <div id="ai-history-list">
+                </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+
+        // --- 1. 获取所有元素 ---
+        const aiButton = document.getElementById('ai-button');
+        const chatBox = document.getElementById('ai-chat-box');
+        const chatHeader = document.getElementById('ai-chat-header');
+        const closeButton = document.getElementById('ai-chat-close');
+        const sendButton = document.getElementById('ai-chat-send');
+        const inputField = document.getElementById('ai-chat-input');
+        const resultsBox = document.getElementById('ai-chat-results');
+        const chatScreen = document.getElementById('ai-chat-screen');
+        const historyScreen = document.getElementById('ai-history-screen');
+        const historyBtn = document.getElementById('ai-chat-history-btn');
+        const historyBackBtn = document.getElementById('ai-history-back-btn');
+        const historyClearBtn = document.getElementById('ai-history-clear-btn');
+        const historyList = document.getElementById('ai-history-list');
+
+        // --- 2. 拖动逻辑 ---
+        // (省略了拖动代码... 它们和你文件里的一样，保持不变)
+        let isDragging = false, dragStartX, dragStartY, buttonStartX, buttonStartY;
+        aiButton.addEventListener('mousedown', (e) => {
+            isDragging = false; dragStartX = e.clientX; dragStartY = e.clientY;
+            const rect = aiButton.getBoundingClientRect();
+            buttonStartX = rect.left; buttonStartY = rect.top;
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        });
+        function onMouseMove(e) {
+            const deltaX = e.clientX - dragStartX, deltaY = e.clientY - dragStartY;
+            if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) { isDragging = true; }
+            if (!isDragging) return;
+            let newX = buttonStartX + deltaX, newY = buttonStartY + deltaY;
+            const winWidth = window.innerWidth, winHeight = window.innerHeight;
+            const btnWidth = aiButton.offsetWidth, btnHeight = aiButton.offsetHeight;
+            if (newX < 0) newX = 0; if (newY < 0) newY = 0;
+            if (newX > winWidth - btnWidth) newX = winWidth - btnWidth;
+            if (newY > winHeight - btnHeight) newY = winHeight - btnHeight;
+            aiButton.style.left = newX + 'px'; aiButton.style.top = newY + 'px';
+            aiButton.style.right = 'auto'; aiButton.style.bottom = 'auto';
+        }
+        function onMouseUp() {
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+        }
+        let isBoxDragging = false, boxDragStartX, boxDragStartY, boxStartX, boxStartY;
+        chatHeader.addEventListener('mousedown', (e) => {
+            isBoxDragging = false; boxDragStartX = e.clientX; boxDragStartY = e.clientY;
+            const rect = chatBox.getBoundingClientRect();
+            boxStartX = rect.left; boxStartY = rect.top;
+            window.addEventListener('mousemove', onBoxMouseMove);
+            window.addEventListener('mouseup', onBoxMouseUp);
+        });
+        function onBoxMouseMove(e) {
+            const deltaX = e.clientX - boxDragStartX, deltaY = e.clientY - boxDragStartY;
+            if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) { isBoxDragging = true; }
+            if (!isBoxDragging) return;
+            let newX = boxStartX + deltaX, newY = boxStartY + deltaY;
+            const winWidth = window.innerWidth, winHeight = window.innerHeight;
+            const boxWidth = chatBox.offsetWidth, boxHeight = chatBox.offsetHeight;
+            if (newX < 0) newX = 0; if (newY < 0) newY = 0;
+            if (newX > winWidth - boxWidth) newX = winWidth - boxWidth;
+            if (newY > winHeight - boxHeight) newY = winHeight - boxHeight;
+            chatBox.style.left = newX + 'px'; chatBox.style.top = newY + 'px';
+            chatBox.style.right = 'auto'; chatBox.style.bottom = 'auto';
+        }
+        function onBoxMouseUp() {
+            window.removeEventListener('mousemove', onBoxMouseMove);
+            window.removeEventListener('mouseup', onBoxMouseUp);
+            isBoxDragging = false;
+        }
+
+        // --- 3. 核心数据和内存逻辑 ---
+        let currentConversation = []; // 当前聊天内容
+        let allHistory = []; // 所有存档
+
+        aiButton.addEventListener('click', () => {
+            if (isDragging) { return; }
+            chatBox.style.display = 'flex';
+            saveChatState();
+        });
+
+        // (⭐️ 关键) 点击“X”关闭按钮
+        closeButton.addEventListener('click', () => {
+            archiveCurrentConversation();
+            currentConversation = []; // (清空)
+            currentConversation.id = null; // (确保ID也清空)
+            saveCurrentConversation();
+            renderConversation(currentConversation); // (渲染欢迎语，把屏幕上的聊天气泡全擦掉)
+            chatBox.style.display = 'none';
+            saveChatState();
+        });
+
+        // --- 4. 历史记录屏幕逻辑 ---
+        historyBtn.addEventListener('click', () => {
+            // 1. 准备数据：先去后台把历史记录列表整理好、画好
+            renderHistoryList();
+            // 2. 隐藏主舞台：把“正在聊天”的屏幕变透明/隐藏
+            chatScreen.style.display = 'none';
+            // 3. 显示副舞台：把“历史记录”的屏幕显示出来（flex布局）
+            historyScreen.style.display = 'flex';
+        });
+        historyBackBtn.addEventListener('click', () => {
+            // 1. 隐藏副舞台：把“历史记录”屏幕关掉
+            historyScreen.style.display = 'none';
+            // 2. 显示主舞台：把“正在聊天”的屏幕重新拿出来
+            chatScreen.style.display = 'flex';
+        });
+        historyClearBtn.addEventListener('click', () => {
+            // 1. 弹窗询问 (系统自带的确认框)
+            // confirm() 会弹出一个窗口，用户点“确定”返回 true，点“取消”返回 false
+            if (confirm('确定要清空所有聊天历史吗？')) {
+
+                // 2. 只有用户点了“确定”，才会执行下面的代码：
+                // A. 清空内存：把存所有历史的大箱子倒空
+                allHistory = [];
+                // B. 更新硬盘：把这个空箱子的状态保存到浏览器里（覆盖掉旧的）
+                saveAllHistory();
+                // C. 刷新屏幕：让界面上的列表也变空（立刻消失）
+                renderHistoryList();
+            }
+        });
+        //-----逆转记录，新的记录放到最上边
+        function renderHistoryList() {
+            //先擦干净黑板记录，防止新记录和旧记录相冲突，相重复
+            historyList.innerHTML = '';
+            if (allHistory.length === 0) {
+                historyList.innerHTML = '<p style="padding: 10px; color: #888;">没有历史记录</p>';
+                return;
+            }
+            allHistory.slice().reverse().forEach(convo => {
+                const item = document.createElement('div');
+                // 穿上样式衣服（CSS）
+                item.className = 'ai-history-item';
+                // 2. 写上标题
+                item.textContent = convo.title;
+                // 3. 贴上隐形条形码 (⭐️ 关键)
+                item.setAttribute('data-id', convo.id);
+                // 这一步用户看不见，是给程序看的。
+                // 把这条记录的唯一身份证号（ID）贴在按钮背面。
+                // 这样点击时，程序才知道你要加载哪一条。
+                item.addEventListener('click', () => {
+                    loadConversation(convo.id);
+                });
+                historyList.appendChild(item);
+            });
+        }
+        function loadConversation(id) {
+            archiveCurrentConversation(); // (先存档，在打开旧文件之前，先把桌子上正在写的文件存进柜子里。否则就弄丢了)
+            const convo = allHistory.find(c => c.id === id);
+            if (convo) {
+                currentConversation = convo.messages;
+                currentConversation.id = id; // (标记当前对话的ID，告诉系统，“我现在桌子上摆的这份文件，不是新的，而是编号为 id 的那份旧档案)
+                saveCurrentConversation();
+                renderConversation(currentConversation);//刷新屏幕。把刚才载入的数据，画成一个个聊天气泡显示出来。
+                historyScreen.style.display = 'none';//把“历史记录屏幕”关掉（none）
+                chatScreen.style.display = 'flex';//把“聊天主屏幕”打开（flex）
+            }
+        }
+
+        // --- 5. AI 交互逻辑 ---
+        sendButton.addEventListener('click', fetchAiResults);
+        inputField.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') { fetchAiResults(); }
+        });
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';'); //"A=1; B=2; C=3" 这样的一长串；.split(';')：这把刀子，照着分号 ; 把长字符串切成一块一块的数组：
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();//去掉首尾的空格
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        //substring：截取字符串。
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        //decodeURIComponent：翻译器。Cookie 里面不能存中文或特殊符号，它们会被加密成怪字符（比如空格变成 %20，中文变成 %E8%96%9B）。
+                        //这个函数负责把它变回人类能看懂的字（比如把 %E8%96%9B 变回 薛
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        //async异步函数，AI 搜索功能的心脏。 它负责：接收用户指令 -> 找服务器要数据 -> 给数据排序 -> 展示给用户。
+        //async异步函数是告诉浏览器，“这函数里有些操作（比如请求网络）会很慢，执行的时候请耐心等待（await），不要把整个网页卡死
+        async function fetchAiResults() {
+            const query = inputField.value.trim();//inputField.value：获取输入框里用户打的字；.trim()：去头尾空格。
+            if (query === "") return;//剪切完空格发现是空的，直接终止函数（return）。不准发空消息骚扰服务器。
+            addMessageToConversation(query, 'user');//调用另一个函数，把刚才那句 query（比如“阿甘正传”）显示在聊天界面右侧（'user' 表示是用户说的）
+            inputField.value = "";//清空输入框。发完消息后，要把框子清干净，方便用户输下一句。
+            //'temp-thinking'：是暂时的ID，结果出来了，就把这条消息删掉，POST：提交数据
+            addMessageToConversation('AI 正在思考中...', 'assistant', 'temp-thinking');
+            try {
+                const csrftoken = getCookie('csrftoken');
+                const response = await fetch('/api/ai_search/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                    body: JSON.stringify({ query: query })
+                });
+                if (!response.ok) { throw new Error('网络请求失败'); }
+                const movies = await response.json();
+                //response.json()：拆包裹，服务器传回来的也是一串 JSON 字符串，这个命令把它变回 JavaScript 的数组（比如 [{title: "肖申克", d_rate: "9.7"}, ...]）
+                // ⭐️ 新增：按评分从高到低排序，movies.sort(...)：这是数组自带（javascript中)的排序工具。它需要一个“比较函数”作为参数。
+                movies.sort((a, b) => {
+                    // 确保把字符串转成数字，防止 '10.0' 排在 '9.0' 后面的情况
+                    // movie.d_rate 对应你在 renderMovies 里使用的字段
+                    //parseFloat是javascript中的解析浮点数，parseFloat(a.d_rate)：把字符串 "9.7" 转换成小数数字 9.7。
+                    //如果不转，按照字符串排序规则，"10" 会排在 "9" 的后面（因为它比较第一位 1 < 9），这会导致排序错误。
+                    const scoreA = parseFloat(a.d_rate) || 0;
+                    const scoreB = parseFloat(b.d_rate) || 0;
+                    return scoreB - scoreA; // B - A 表示降序，是正数，（大的在前），
+                });
+                renderMovies(movies);
+            } catch (error) {
+                console.error("AI 请求失败:", error);
+                removeTempMessage('temp-thinking');
+                addMessageToConversation('抱歉，AI 助手好像出错了...', 'assistant');
+            }
+        }
+        //console是控制台， console.error是控制台报错
+        function renderMovies(movies) {
+            removeTempMessage('temp-thinking');
+            if (!movies || movies.length === 0) {
+                addMessageToConversation('抱歉，没能找到匹配的电影...', 'assistant');
+                return;
+            }
+            let moviesHtml = '';
+            //||''是防错机制，左边坏了，就用右边
+            movies.forEach(movie => {
+                const movieCover = movie.image_link || '';
+                const movieScore = movie.d_rate || '暂无';
+                moviesHtml += `
+                    <div class="ai-movie-card">
+                        <img src="${movieCover}" alt="${movie.name}">
+                        <div class="ai-movie-card-info">
+                            <a href="/movie/${movie.id}/" target="_blank">${movie.name}</a>
+                            <p>评分: ${movieScore}</p>
+                        </div>
+                    </div>
+                `;
+            });
+            addMessageToConversation(moviesHtml, 'assistant', null, true);
+            //true是会把内容当成 HTML 代码渲染（于是你能看到图片和链接），如果这个开关是 false（默认）：它会把内容当成纯文字（于是你会看到满屏的 <div> 代码显示在屏幕上）。
+        }
+
+        // --- 6. 辅助函数 (渲染/添加/移除) ---
+        function renderConversation(messages) {
+            resultsBox.innerHTML = '';
+            if (messages.length === 0) {
+                 resultsBox.innerHTML = '<div class="ai-message assistant"><p>你好！请告诉我你对电影的描述或标签 (例如: "关于机器人的科幻片" 或 "喜剧")</p></div>';
+            } else {
+                messages.forEach(msg => {
+                    let messageDiv;
+                    //卡片就不用加气泡背景色，else不是就加，'user'（用户，蓝色）或者 'assistant'（AI，白色）。通过这个类名来区分左右和颜色
+                    if (msg.isRawHtml) {
+                        messageDiv = document.createElement('div');
+                        messageDiv.innerHTML = msg.html;
+                    } else {
+                        messageDiv = document.createElement('div');
+                        messageDiv.classList.add('ai-message', msg.role);
+                        messageDiv.innerHTML = `<p>${msg.html}</p>`;
+                    }
+                    if (msg.tempId) {
+                        messageDiv.id = msg.tempId;
+                    }
+                    resultsBox.appendChild(messageDiv);
+                    //把这个聊天记录追加到列表的最下面
+                });
+            }
+            resultsBox.scrollTop = resultsBox.scrollHeight;
+            //把滚动的位置，设为总高度那么大，就是可以滚到底
+        }
+        function addMessageToConversation(htmlContent, role, tempId = null, isRawHtml = false) {
+            // 1. 【核心动作】记账
+            // currentConversation 是那个存所有聊天记录的数组
+            // .push() 意思是：在数组的最后面追加这一条新数据；tempId:身份证："temp-thinking" (如果是思考中)
+            currentConversation.push({
+                html: htmlContent, role: role, tempId: tempId, isRawHtml: isRawHtml
+            });
+            saveCurrentConversation(); // (每次添加都保存)
+            // 3. 刷新屏幕
+            // 告诉放映员：“数据变了，请根据最新的列表重新画一遍画面！”
+            renderConversation(currentConversation);
+        }
+        function removeTempMessage(tempId) {
+            // 1. 【核心动作】过滤 (Filter)
+            // 这是一个非常经典的删除写法。
+            // 它的逻辑是：“留下所有 ID 不等于 tempId 的消息”。
+            // 结果就是：那个 ID 等于 tempId 的倒霉蛋被踢出去了。
+            currentConversation = currentConversation.filter(msg => msg.tempId !== tempId);
+            saveCurrentConversation(); // (每次移除都保存)
+            // 3. 刷新屏幕
+            // 告诉放映员：“那条消息被删了，重新画一遍屏幕（此时思考中的气泡就会消失）。”
+            renderConversation(currentConversation);
+        }
+        function archiveCurrentConversation() {
+            if (currentConversation.length > 0) {
+                // 1. 找标题：找到用户说的第一句话
+                const firstUserMsg = currentConversation.find(m => m.role === 'user');
+                // 2. 截取前30个字
+                // 如果找到了用户说的话，就取前30个字加“...”作为标题（比如“帮我找几部好看的科幻...”）。
+                // 如果没找到（比如只有AI说话），就叫“无标题对话”。
+                const title = firstUserMsg ? firstUserMsg.html.substring(0, 30) + '...' : '无标题对话';
+                //3. 倒垃圾（过滤临时消息）
+                // 我们不需要把“AI 正在思考中...”这种废话存进历史记录里。
+                // filter(!msg.tempId) 的意思是：只保留那些没有临时ID的正经消息。
+                const cleanMessages = currentConversation.filter(msg => !msg.tempId);
+
+                if (cleanMessages.length > 0) {
+                    const existing = allHistory.find(c => c.id === currentConversation.id);
+                    if (existing) {
+                        // (更新)
+                        // ⭐️ 情况 A：这是旧档案（更新）
+                        // 比如你打开了一个昨天的记录，又聊了两句。
+                        // 这时候不能新建一个档案，而是要找到原来的档案，把新的聊天内容覆盖进去。
+                        existing.messages = cleanMessages;// 更新内容
+                        existing.title = title;//更新标题（万一你第一句话改了）
+                    } else {
+                         // (新增)
+                         // ⭐️ 情况 B：这是新档案（新建）
+                        // 这是一个全新的聊天，从来没存过。
+                         allHistory.push({
+                            id: Date.now(),  // 生成一个身份证号（用当前时间戳，保证不重复）,Date.now() :返回当前时间的毫秒数（一串很长的数字）。时间永远在往前走，永远不会重复
+                            title: title,    // 刚才起好的标题
+                            messages: cleanMessages     // 刚才打扫干净的内容
+                        });
+                    }
+                    saveAllHistory();
+                }
+            }
+        }
+
+        // --- 7. 内存 (localStorage) 读写 ---
+        function saveChatState() {
+            // 名字叫 'aiChatState'
+            // 内容是 chatBox.style.display (可能是 'flex' 或 'none')
+            localStorage.setItem('aiChatState', chatBox.style.display);
+        }
+
+        //localStorage (本地存储);用法：localStorage.setItem('名字', '内容')。;JSON.stringify(...) (打包压缩)：
+        //localStorage 它只能存字符串（文字），不能直接存数组或对象。必须用 JSON.stringify 把数组“冷冻”成一串纯文本字符串，才能塞进去。
+
+
+        function saveCurrentConversation() {
+            // 名字叫 'aiCurrentConversation'
+            // 内容：把当前 ID 和 聊天内容打包成字符串
+            localStorage.setItem('aiCurrentConversation', JSON.stringify({
+                id: currentConversation.id,
+                messages: currentConversation
+            }));
+        }
+        function saveAllHistory() {
+            // 名字叫 'aiChatHistory'
+            // 内容：把存着所有旧记录的大数组 allHistory 打包
+            localStorage.setItem('aiChatHistory', JSON.stringify(allHistory));
+        }
+
+        // --- 8. (⭐️ V4 关键修复) 页面卸载时：自动存档 ---
+        /**
+            window：整个浏览器窗口。
+            beforeunload：这是一个非常特殊的系统事件。意思：“在页面即将卸载（关闭/刷新）之前”。
+            时机：就在你点下关闭按钮，但窗口还没真正消失的那几毫秒里。这是你保存数据的最后机会。
+         * 当用户点击链接或刷新页面 (即卸载页面) 时，
+         * 自动将当前聊天存档，并清空，把你现在桌面上正在聊的这些内容，赶紧整理好，塞进 allHistory（历史记录档案柜）里
+         * 以便下一页加载时显示“欢迎”界面。
+         */
+        window.addEventListener('beforeunload', function(e) {
+            // 1. 存档当前对话
+            archiveCurrentConversation();
+
+            // 2. 清空当前对话，为下一页做准备
+            currentConversation = []; // (创建一个空数组)
+            currentConversation.id = null; // (确保ID也为空)
+            saveCurrentConversation();
+        });
+
+
+        // --- 9. (⭐️ V4 修改) 加载 (启动) ---
+        function loadChatState() {
+            const savedState = localStorage.getItem('aiChatState');
+            //读取：去硬盘里查一下 aiChatState，看看上次你关浏览器的时候，聊天框是打开的还是关闭的
+            //如果存的是 'flex'（打开状态），那么现在就设为 'flex'（打开）；否则就设为 'none'（关闭）。
+            chatBox.style.display = (savedState === 'flex') ? 'flex' : 'none';
+            //localStorage.getItem(...)：尝试去拿历史记录。|| '[]' (保底机制)：
+            //意思是：“如果硬盘里什么都没找到（是 null），那就给我一个空的数组字符串 '[]'。”
+            //防止第一次使用时因为找不到数据而报错。JSON.parse(...) (解冻)：之前存的时候用了 JSON.stringify（把数组冻成字符串）。现在读出来了，必须用 parse 把它解冻回 JS 能用的数组
+            //同样是去硬盘找。如果没找到，就默认是一个空对象 {}。
+            allHistory = JSON.parse(localStorage.getItem('aiChatHistory') || '[]');
+            //把读出来的数据，分别填回 currentConversation（消息列表）和 currentConversation.id（当前对话ID）这两个变量里。
+            const savedConvo = JSON.parse(localStorage.getItem('aiCurrentConversation') || '{}');
+            currentConversation = savedConvo.messages || [];
+            currentConversation.id = savedConvo.id || null;
+
+            //数据都恢复到内存里了，现在调用“放映员”函数，把这些数据变成气泡显示在屏幕上。
+            renderConversation(currentConversation);
+            //强制隐藏“历史记录列表”，强制显示“聊天主界面”。
+            //目的：防止出现 Bug，比如一刷新网页，结果显示的是历史记录界面，那就不对了。默认进来永远是聊天界面。
+            historyScreen.style.display = 'none';
+            chatScreen.style.display = 'flex';
+        }
+
+        // --- 10. (启动) 页面加载时：读取“记忆” ---
+        loadChatState();
+
+    });
+</script>

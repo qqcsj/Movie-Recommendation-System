@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>角色投票手账（最终精修版）</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Long+Cang&display=swap" rel="stylesheet">
+
+    <style>
+        /* ================= 基础样式 ================= */
+        body {
+        margin: 0;
+         font-family: sans-serif;
+         overflow: auto;
+          background-color: #f0f2f5; }
+
+        /* 1. 核心容器 */
+        #vote-entry-btn {
+            position: fixed;
+            top: 100px; left: 50px;
+            width: 140px;
+            height: 210px;
+            cursor: grab;
+            z-index: 9990;
+            user-select: none;
+            transform: rotate(-3deg);
+            transition: transform 0.2s;
+        }
+        #vote-entry-btn:active { cursor: grabbing; }
+
+        /* ⭐️ 2. 钢笔优化 (更细、旋转角度更大) ⭐️ */
+        .pen-wrapper {
+            position: absolute;
+            top: 40px;
+            right: -40px; /* 稍微调整位置 */
+            width: 45px;  /* 宽度变细 (原55px) */
+            height: 140px;
+            z-index: 20;
+            pointer-events: auto;
+            filter: drop-shadow(4px 8px 5px rgba(0,0,0,0.4));
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform-origin: 50% 50%;
+        }
+        /* 鼠标碰到笔：角度增大，更贴近纸张 */
+        .pen-wrapper:hover {
+            transform: rotate(30deg) scale(1.05) translate(-10px, 5px);
+            cursor: pointer;
+        }
+
+        /* 3. 纸张部分 */
+        .paper-wrapper {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: auto;
+            transform-origin: center 20%;
+        }
+        @keyframes windFloat {
+            0%, 100% { transform: rotate(0deg) translateY(0); }  /*rotate(0deg)：不旋转。translateY(0)：不移动（回到原位），保证动画开始和结束的状态是一模一样的，这样循环播放时才会“无缝衔接”，不会出现跳顿*/
+            25% { transform: rotate(2deg) translateY(-2px); }   /*rotate(2deg)：向右歪一点点 (顺时针旋转 2 度)。translateY(-2px)：向上飘一点点 (Y轴负数是向上，飘了 2 像素)*/
+            75% { transform: rotate(-1.5deg) translateY(1px); } /*rotate(-1.5deg)：向左歪一点点 (逆时针旋转 1.5 度)。translateY(1px)：向下沉一点点 (Y轴正数是向下，沉了 1 像素)*/
+        }
+        .paper-wrapper:hover {
+            animation: windFloat 2.5s ease-in-out infinite;
+        }
+        .paper-svg-container {
+            position: absolute;
+            width: 100%; height: 100%;
+            top: 0; left: 0;
+            filter: drop-shadow(2px 5px 3px rgba(0,0,0,0.2));
+        }
+
+        /* 4. 文字与星星 */
+        .text-container {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+        }
+        .movable-item {
+            position: absolute;
+            opacity: 0;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            transition: top 0.5s ease-out, left 0.5s ease-out, opacity 0.3s ease;
+        }
+        .movable-item.active { opacity: 1; }
+        .ink-char {
+            font-family: "Long Cang", cursive;
+            font-size: 24px;
+            color: #2c3e50;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+            white-space: nowrap;
+        }
+        .ink-char.font-special {
+            font-family: "Comic Sans MS", cursive;
+            font-weight: bold;
+            font-size: 20px;
+            color: #5d4037;
+        }
+        /* 星星 */
+        .star-container { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; z-index: 5; }
+        .star-rotator { display: inline-block; transition: transform 1s cubic-bezier(0.25, 1, 0.5, 1); }
+        .magic-star { font-size: 26px; display: inline-block; filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.8)); }
+        .movable-item.active .magic-star { animation: starPulse 0.8s infinite alternate; }
+        @keyframes starPulse { 0% { transform: scale(0.9); } 100% { transform: scale(1.3); } }
+
+        /* ================= 5. 黑板弹窗样式 ================= */
+        #blackboard-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; justify-content: center; align-items: center; }
+        .blackboard { width: 90%; max-width: 1000px; height: 85vh; background-color: #2e3b32; border: 15px solid #5d4037; border-radius: 5px; box-shadow: 0 0 20px rgba(0,0,0,0.8), inset 0 0 50px rgba(0,0,0,0.5); position: relative; color: #fff; font-family: "Comic Sans MS", "Chalkboard SE", sans-serif; display: flex; flex-direction: column; padding: 10px 25px; box-sizing: border-box; }
+        .board-header { flex-shrink: 0; text-align: center; position: relative; padding-bottom: 10px; border-bottom: 2px dashed rgba(255,255,255,0.3); margin-bottom: 15px; }
+        .chalk-title { margin: 10px 0 5px 0; font-size: 2.2rem; color: #fff; text-shadow: 2px 2px 0px #7f8c8d; font-family: inherit; }
+        .close-board { position: absolute; top: 0; right: 0; font-size: 35px; line-height: 35px; cursor: pointer; color: #bdc3c7; transition: color 0.2s; }
+        .close-board:hover { color: #e74c3c; }
+        .board-content { flex-grow: 1; overflow-y: auto; overflow-x: hidden; padding-right: 5px; }
+        .board-content::-webkit-scrollbar { width: 8px; }
+        .board-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        .board-content::-webkit-scrollbar-track { background: transparent; }
+        .char-grid { display: flex; flex-wrap: wrap; justify-content: space-between; align-content: flex-start; }
+        .char-item { width: 49%; background: rgba(255,255,255,0.05); margin-bottom: 12px; padding: 8px 15px; box-sizing: border-box; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); transition: background 0.2s; }
+        .char-item:hover { background: rgba(255,255,255,0.1); }
+        .char-info h4 { margin: 0; font-size: 1.1rem; color: #f1c40f; font-family: inherit; text-align: left; }
+        .char-info span { font-size: 0.85rem; color: #bdc3c7; text-align: left; margin-top: 3px; }
+        .vote-actions { display: flex; gap: 10px; align-items: center; }
+        .btn-chalk { background: none; border: 2px solid rgba(255,255,255,0.3); color: white; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: all 0.2s; outline: none; font-family: inherit; font-size: 0.9rem; }
+        .btn-like:hover { border-color: #e74c3c; color: #e74c3c; background: rgba(231, 76, 60, 0.1); }
+        .btn-dislike:hover { border-color: #ecf0f1; color: #ecf0f1; background: rgba(255,255,255, 0.1); }
+
+        /* 底部翻页器 */
+        .board-footer { flex-shrink: 0; display: flex; justify-content: center; align-items: center; padding-top: 15px; gap: 15px; font-size: 1.2rem; }
+        .page-btn { cursor: pointer; user-select: none; color: #fff; border-bottom: 1px solid transparent; }
+        .page-btn:hover:not(.disabled) { border-bottom: 1px solid white; color: white; }
+        .page-btn.disabled { color: #555; cursor: default; }
+        .page-info { color: #95a5a6; font-size: 1rem; }
+        .page-jump { display: flex; align-items: center; gap: 5px; margin: 0 10px; }
+        .page-jump input { width: 40px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #f1c40f; text-align: center; border-radius: 4px; padding: 4px; outline: none; font-family: inherit; }
+        .page-jump input:focus { border-color: #f1c40f; }
+        .btn-jump { background: none; border: 1px solid rgba(255,255,255,0.3); color: #ccc; font-size: 0.9rem; padding: 3px 10px; border-radius: 4px; }
+        .btn-jump:hover { border-color: #2ecc71; color: #2ecc71; }
+
+        /* ⭐️ 6. 自定义警告弹窗 (小黑板风格) ⭐️ */
+        #custom-alert-modal {
+            display: none; /* 默认隐藏 */
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 12000; /* 比大黑板层级更高 */
+            justify-content: center; align-items: center;
+        }
+        .small-blackboard {
+            width: 300px; height: 180px;
+            background-color: #2e3b32;
+            border: 8px solid #5d4037;
+            border-radius: 4px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            color: #fff;
+            font-family: "Comic Sans MS", "Chalkboard SE", sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        .alert-msg {
+            font-size: 1.2rem;
+            margin-bottom: 25px;
+            color: #f1c40f;
+            letter-spacing: 1px;
+        }
+
+        /* ⭐️ 7. 黑板擦形状的按钮 ⭐️ */
+        .eraser-btn {
+            /* 上半部分：木柄 */
+            background-color: #8d6e63;
+            background-image: linear-gradient(to bottom, #8d6e63 50%, #5d4037 100%);
+            width: 100px;
+            height: 35px;
+            border: none;
+            border-radius: 3px 3px 0 0; /* 上面圆角 */
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            /* 下半部分：毛毡层 (通过 box-shadow 或 border 模拟) */
+            border-bottom: 8px solid #333; /* 模拟黑色毛毡层 */
+            display: flex; justify-content: center; align-items: center;
+            font-family: inherit;
+            transition: transform 0.1s;
+        }
+        /* 增加毛毡的纹理感 */
+        .eraser-btn::after {
+            content: '';
+            position: absolute;
+            bottom: -8px; left: 0; width: 100%; height: 8px;
+            background: repeating-linear-gradient(90deg, #333, #333 2px, #444 2px, #444 4px);
+        }
+        .eraser-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 3px rgba(0,0,0,0.3);
+        }
+
+        /* 特效动画 */
+        .effect-container {
+            position: fixed;
+             pointer-events: none;
+             z-index: 10001;
+              top: 0;
+              left: 0;
+               width: 100%;
+               height: 100%;
+               overflow: hidden;
+         }
+        .anim-heart-float {
+            position: absolute;
+            font-size: 2rem;
+             color: #e74c3c;
+             animation: floatHeart 1s ease-out forwards;
+         }
+        @keyframes floatHeart {
+            0% { transform: translateY(0) scale(0.5); opacity: 0; }
+            20% { transform: translateY(-20px) scale(1.2); opacity: 1; }
+             100% { transform: translateY(-80px) scale(1.5); opacity: 0; }
+             }
+        .egg-white-blob {
+            position: absolute;
+            background: rgba(236, 240, 241, 0.9);
+            border-radius: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            opacity: 0.9;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+             z-index: 10002;
+              animation: splatMain 1.2s ease-out forwards;
+          }
+        .egg-yolk-blob {
+            position: absolute;
+            width: 24px;
+             height: 24px;
+              background: radial-gradient(circle at 35% 35%, #ffeb3b, #fbc02d);
+              border-radius: 50%;
+              transform: translate(-50%, -50%) scale(0);
+              z-index: 10003;
+              box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+               animation: splatMain 1.2s ease-out forwards;
+               animation-delay: 0.05s;
+           }
+        .egg-debris {
+            position: absolute;
+            border-radius: 50%;
+            z-index: 10004;
+             transform: translate(-50%, -50%);
+             opacity: 1;
+          }
+        @keyframes splatMain {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 0.8; }
+            15% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            30% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            70% { opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1) translateY(20px); opacity: 0; }
+         }
+
+       /* ================== 1. 修正版：纯金流光星星 (无蓝) ================== */
+        /* 按钮容器 (保持位置不变) */
+        .chalk-report-btn {
+            position: absolute;
+            top: 5px;
+            right: 70px;
+            width: 60px;
+            height: 80px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            outline: none;
+            padding: 0;
+            perspective: 500px;
+        }
+
+        .star-magnet {
+            width: 50px;
+            height: 50px;
+            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+
+            /* 🎨 修改点：纯黄色系高质感渐变 (高光白黄 -> 纯金 -> 深橙金) */
+            /* 这样会让星星看起来像是有凸起的立体感 */
+            background: linear-gradient(135deg, #fff176 0%, #ffd700 40%, #ffa500 80%, #ff8c00 100%);
+
+            /* 🧊 质感增强：内部高光 + 外部微弱投影 */
+            box-shadow: inset 2px 2px 5px rgba(255,255,255,0.9), inset -2px -2px 5px rgba(184, 134, 11, 0.4);
+            filter: drop-shadow(0 3px 2px rgba(0,0,0,0.3));
+
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        /* ⭐️ 3. 文字提示 (默认隐藏) ⭐️ */
+        .magnet-text {
+            margin-top: 5px; /* 离星星远一点 */
+            font-family: "Long Cang", cursive; /* 手写体 */
+            font-size: 14px;
+            color: #f1c40f; /* 黄色文字 */
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            opacity: 0; /* 默认看不见 */
+            transform: translateY(-10px); /* 默认往上飘一点 */
+            transition: all 0.3s ease;
+            pointer-events: none; /* 让鼠标无法选中文字，防误触 */
+            white-space: nowrap;
+        }
+
+        /* 🖱️ 悬停特效：本身变亮 + 纯金色光晕 (去掉了蓝色光晕) */
+        .chalk-report-btn:hover .star-magnet {
+            transform: scale(1.15) rotate(144deg);
+
+            /* ✨ 发光修改：
+               1. brightness: 让本体像灯泡一样亮起来
+               2. drop-shadow 1: 紧贴的亮白光
+               3. drop-shadow 2: 向外扩散的金光
+            */
+            filter: brightness(1.2)
+                    drop-shadow(0 0 5px rgba(255, 255, 200, 1))
+                    drop-shadow(0 0 20px rgba(255, 215, 0, 0.8));
+        }
+        /* 文字显现 */
+        .chalk-report-btn:hover .magnet-text {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ⭐️ 5. 鼠标点击特效 ⭐️ */
+        .chalk-report-btn:active .star-magnet {
+            transform: scale(0.9) rotate(144deg); /* 保持旋转角度，但缩小 */
+            filter: drop-shadow(0 0 5px rgba(255,255,255,0.5)); /* 点击时光芒收缩 */
+        }
+
+        /* 点击时，文字强制消失 */
+        .chalk-report-btn:active .magnet-text {
+            opacity: 0;
+            transition: none; /* 瞬间消失，不要动画 */
+        }
+
+        /* ⭐️ 修改：让报表弹窗更大，占满屏幕大部分 */
+        .report-overlay {
+            position: absolute;
+            /* 扩大显示区域 */
+            top: 10px; bottom: 10px; left: 10px; right: 10px;
+            background: rgba(46, 59, 50, 0.98);
+            z-index: 500;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border-radius: 8px;
+            border: 3px solid rgba(255,255,255,0.3);
+            padding: 15px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+        .report-img-container {
+            flex-grow: 1;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+            /* 给图片容器加个深色背景，突出图表 */
+            background-color: #2e3b32;
+            border-radius: 4px;
+        }
+        .report-img-container img {
+            /* 让图片尽可能大，但保持比例 */
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* ⭐️ 新增：底部工具栏 (所有按钮放一行) */
+        .report-toolbar {
+            margin-top: 15px;
+            width: 100%;
+            display: flex;
+            justify-content: center; /* 居中排列 */
+            align-items: center;
+            gap: 30px; /* 按钮组之间的间距 */
+            background: rgba(0,0,0,0.2); /* 底部加深条 */
+            padding: 10px;
+            border-radius: 50px;
+        }
+
+        .report-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 20px;
+        }
+        /* 更新按钮样式 (绿色粉笔) */
+        .btn-update {
+            background: linear-gradient(90deg, #84fab0 0%, #8fd3f4 100%);
+            color: #2e3b32;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .btn-update:hover { transform: scale(1.1); }
+        .btn-close-report {
+            background: transparent;
+            border: 1px solid #bdc3c7;
+            color: #bdc3c7;
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .btn-close-report:hover {
+            color: white;
+            border-color: white;
+        }
+/* ================== 2. 新增：离开确认弹窗 (小黑板风格) ================== */
+        #confirm-close-modal {
+            display: none; /* 默认隐藏 */
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 12000;
+            justify-content: center; align-items: center;
+            backdrop-filter: blur(2px);
+        }
+
+        .confirm-board {
+            width: 380px; height: 220px;
+            background-color: #2e3b32;
+            border: 12px solid #5d4037; /* 木框 */
+            border-radius: 6px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.6), inset 0 0 40px rgba(0,0,0,0.5);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            position: relative;
+        }
+        /* 木纹理装饰 */
+        .confirm-board::before {
+            content: ''; position: absolute; top: -12px; left: -12px; right: -12px; bottom: -12px;
+            border: 2px solid rgba(255,255,255,0.1); border-radius: 4px; pointer-events: none;
+        }
+        .confirm-title-area {
+            display: flex; align-items: center; gap: 15px; margin-bottom: 30px;
+        }
+
+        /* 🎨 纯CSS画一根白色粉笔 */
+        .chalk-stick-icon {
+            width: 40px; height: 10px;
+            background: #fff;
+            border-radius: 2px;
+            transform: rotate(-15deg);
+            box-shadow: 2px 2px 2px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        /* 粉笔头 */
+        .chalk-stick-icon::after {
+            content: ''; position: absolute; right: -2px; top: 0; width: 5px; height: 100%;
+            background: #eee; border-radius: 0 50% 50% 0;
+        }
+
+        .chalk-text-lg {
+            font-family: "Long Cang", cursive;
+            font-size: 28px; color: rgba(255,255,255,0.95);
+            /* ☁️ 粉笔字质感：微模糊 + 颗粒感阴影 */
+            text-shadow: 2px 2px 0px rgba(255,255,255,0.1), 0 0 2px rgba(255,255,255,0.4);
+            letter-spacing: 2px;
+        }
+
+        .confirm-btns { display: flex; gap: 30px; }
+
+        /* ================== 2. 修正版：严格等大的立体黑板擦 ================== */
+        .eraser-btn-3d {
+            position: relative;
+            /* 📏 强制统一尺寸 */
+            width: 110px;
+            height: 40px;
+            border: none; outline: none; cursor: pointer;
+            font-family: "Ma Shan Zheng", cursive; font-size: 18px; color: #fff;
+            transition: transform 0.1s;
+            display: flex; align-items: center; justify-content: center;
+            /* 让文字稍微靠上一点，视觉重心更稳 */
+            padding-bottom: 4px;
+            margin: 0 10px; /* 增加一点左右间距 */
+        }
+
+        /* --- 样式 A: 经典木质 (离开) --- */
+        .style-wood {
+            /* 木头纹理背景 */
+            background: linear-gradient(to bottom, #8d6e63, #5d4037);
+            border-radius: 4px 4px 2px 2px;
+            text-shadow: 0 1px 1px rgba(0,0,0,0.5);
+
+            /* 🧱 严格控制阴影高度：总共 10px */
+            box-shadow:
+                0 3px 0 #3e2723,  /* 1. 深色木头层 (3px) */
+                0 6px 0 #212121,  /* 2. 黑色硬毡层 (3px) */
+                0 10px 0 #eeeeee, /* 3. 白色粉笔灰层 (4px) -> 视觉重点 */
+                0 15px 10px rgba(0,0,0,0.5); /* 4. 投影 */
+        }
+
+        /* --- 样式 B: 蓝色塑料 (再想想) --- */
+        .style-plastic {
+            /* 蓝色塑料背景 */
+            background: linear-gradient(to bottom, #42a5f5, #1565c0);
+            border-radius: 4px 4px 2px 2px;
+            text-shadow: 0 1px 1px rgba(0,0,0,0.3);
+
+            /* 🧱 严格控制阴影高度：也是 10px，确保对齐 */
+            box-shadow:
+                0 3px 0 #0d47a1,  /* 1. 深蓝塑料层 (3px) */
+                0 6px 0 #333333,  /* 2. 黑色硬毡层 (3px) */
+                0 10px 0 #546e7a, /* 3. 灰色软毡层 (4px) -> 对应上面的白色层 */
+                0 15px 10px rgba(0,0,0,0.5); /* 4. 投影 */
+        }
+
+        /* 按下效果：两个按钮下沉高度必须一致 */
+        .eraser-btn-3d:active {
+            transform: translateY(6px); /* 向下按压 */
+        }
+
+        /* 按下时压缩阴影，保持一致的压缩感 */
+        .style-wood:active {
+            box-shadow: 0 0 0 #3e2723, 0 1px 0 #212121, 0 4px 0 #eeeeee, 0 4px 5px rgba(0,0,0,0.3);
+        }
+        .style-plastic:active {
+            box-shadow: 0 0 0 #0d47a1, 0 1px 0 #333333, 0 4px 0 #546e7a, 0 4px 5px rgba(0,0,0,0.3);
+        }
+
+        /* ⭐️ 修复：Loading 文字悬浮居中样式 ⭐️ */
+        .report-img-container p {
+            position: absolute; /* 绝对定位，不再占位置 */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%); /* 精确居中 */
+
+            /* 美化一下：加个半透明黑底，让字看得更清楚 */
+            background: rgba(0, 0, 0, 0.6);
+            color: #fff !important; /* 强制白色文字 */
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            z-index: 10; /* 保证浮在图片上面 */
+            pointer-events: none; /* 让鼠标可以穿透它 */
+
+            /* 加个小动画 */
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -60%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+
+        /* 翻页按钮样式优化 */
+        .btn-chalk-nav {
+            background: transparent;
+            border: 2px solid rgba(255,255,255,0.5);
+            color: #fff;
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+        .btn-chalk-nav:hover:not(:disabled) {
+            border-color: #f1c40f;
+            color: #f1c40f;
+            background: rgba(255,255,255,0.1);
+            transform: scale(1.05);
+        }
+        .btn-chalk-nav:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            border-color: #555;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="vote-entry-btn">
+        <div class="pen-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 180">
+                <defs>
+                    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:#1a1a1a"/>
+                        <stop offset="40%" style="stop-color:#4a4a4a"/>
+                        <stop offset="100%" style="stop-color:#000000"/>
+                    </linearGradient>
+                    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:#cfa550"/>
+                        <stop offset="50%" style="stop-color:#ffecb3"/>
+                        <stop offset="100%" style="stop-color:#9e7d30"/>
+                    </linearGradient>
+                </defs>
+                <path fill="url(#bodyGrad)" d="M15,140 L12,20 C10,8 15,0 30,0 C45,0 50,8 48,20 L45,140 Z" />
+                <rect x="13" y="130" width="34" height="4" fill="url(#goldGrad)" />
+                <rect x="14" y="136" width="32" height="1.5" fill="url(#goldGrad)" />
+                <path fill="#111" d="M15,140 L18,155 L42,155 L45,140 Z" />
+                <path fill="url(#goldGrad)" d="M20,155 L30,175 L40,155 Z" />
+                <line x1="30" y1="155" x2="30" y2="170" stroke="#000" stroke-width="0.5" />
+                <path fill="url(#goldGrad)" d="M48,15 L50,18 L50,45 C50,48 47,48 47,45 L47,18 Z" />
+            </svg>
+        </div>
+
+        <div class="paper-wrapper">
+            <div class="paper-svg-container">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 210">
+                    <defs>
+                        <linearGradient id="paperBase" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#fffdf5" />
+                            <stop offset="100%" stop-color="#f2e6cf" />
+                        </linearGradient>
+                        <linearGradient id="foldShadow" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#e0d0b0" />
+                            <stop offset="100%" stop-color="#fff" />
+                        </linearGradient>
+                        <filter id="softShadow">
+                            <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.1"/>
+                        </filter>
+                    </defs>
+                    <path fill="url(#paperBase)" filter="url(#softShadow)" d="M 5,5 L 105,5 L 135,35 L 135,195 Q 100,205 70,200 T 5,195 Z" />
+                    <path fill="url(#foldShadow)" d="M 105,5 L 105,35 L 135,35 Z" stroke="#dcc" stroke-width="0.5"/>
+                    <path fill="none" stroke="#d4c5a3" stroke-width="1" opacity="0.4" d="M 10,190 Q 70,200 130,190" />
+                    <g stroke="#a89f91" stroke-width="0.5" opacity="0.3" stroke-dasharray="2,2">
+                        <line x1="15" y1="70" x2="125" y2="70" />
+                        <line x1="15" y1="120" x2="125" y2="120" />
+                        <line x1="15" y1="170" x2="125" y2="170" />
+                    </g>
+                </svg>
+            </div>
+
+            <div class="text-container">
+                <span class="movable-item ink-char">为</span>
+                <span class="movable-item ink-char font-special">TA</span>
+                <span class="movable-item ink-char">撑</span>
+                <span class="movable-item ink-char">腰</span>
+                <div class="movable-item star-container">
+                    <div class="star-rotator"><span class="magic-star">✨</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-alert-modal">
+        <div class="small-blackboard">
+            <div class="alert-msg">请输入正确的页码</div>
+            <button class="eraser-btn" onclick="document.getElementById('custom-alert-modal').style.display='none'">
+                确定
+            </button>
+        </div>
+    </div>
+
+    <div id="confirm-close-modal">
+            <div class="confirm-board">
+                <div class="confirm-title-area">
+                    <div class="chalk-stick-icon"></div>
+                    <h2 class="chalk-text-lg">确定离开吗？</h2>
+                </div>
+                <div class="confirm-btns">
+                    <button class="eraser-btn-3d style-wood" onclick="window.voteApp.realCloseBoard()">
+                        离 开
+                    </button>
+                    <button class="eraser-btn-3d style-plastic" onclick="window.voteApp.cancelClose()">
+                        再想想
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    {% verbatim %}
+    <div id="blackboard-modal">
+        <div class="blackboard" id="vote-app">
+            <div class="board-header">
+                <span class="close-board" @click="closeBoard">×</span>
+                <h2 class="chalk-title">✏️ 为你喜欢的人物拉一票吧</h2>
+                <button class="chalk-report-btn" @click="openReport">
+                    <div class="star-magnet"></div>
+                    <span class="magnet-text">查看报表</span>
+               </button>
+            </div>
+
+            <!-- 修改 report-overlay 内部结构 -->
+            <div class="report-overlay" v-if="showReport">
+                <h3 style="color: #f1c40f; margin: 0 0 10px 0; font-size: 24px;">
+                    <span v-if="reportPage === 1">📊 实时数据分析（柱状图）</span>
+                    <span v-else-if="reportPage === 2">🍰 实时数据分析（饼状图）</span>
+                    <span v-else-if="reportPage === 3">📈 实时数据分析（折线图）</span>
+                    <span v-else>🕸️ 实时数据分析（雷达图）</span>
+                </h3>
+
+                <div class="report-img-container">
+                    <p v-if="loadingReport" style="color: #fff; font-size: 20px;">正在绘制图表...</p>
+                    <img v-if="reportImage" :src="reportImage" alt="统计报表">
+                </div>
+
+                <div class="report-toolbar">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <button class="btn-chalk-nav" @click="prevReportPage" :disabled="reportPage <= 1">◀ 上一页</button>
+                        <span style="color: white; font-family: 'Long Cang', cursive; font-size: 22px; min-width: 80px; text-align: center;">
+                            第 {{ reportPage }} 页
+                        </span>
+                        <button class="btn-chalk-nav" @click="nextReportPage" :disabled="reportPage >= 4">下一页 ▶</button>
+                    </div>
+
+                    <div style="width: 2px; height: 30px; background: rgba(255,255,255,0.3);"></div>
+
+                    <div style="display: flex; align-items: center; gap: 20px;">
+                        <button class="btn-update" @click="fetchReport" style="font-size: 16px; padding: 8px 25px;">🔄 更新数据</button>
+                        <button class="btn-close-report" @click="showReport = false" style="font-size: 16px; padding: 8px 25px;">关闭</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="board-content">
+                <div class="char-grid">
+                    <div class="char-item" v-for="(char, index) in paginatedCharacters" :key="char.id">
+                        <div class="char-info">
+                            <h4>{{ (currentPage-1)*pageSize + index + 1 }}. {{ char.name }}</h4>
+                            <span>《{{ char.movie }}》</span>
+                        </div>
+                        <div class="vote-actions">
+                            <button class="btn-chalk btn-like" @click="vote(char, 'like', $event)">
+                                ❤️ {{ char.likes }}
+                            </button>
+                            <button class="btn-chalk btn-dislike" @click="vote(char, 'dislike', $event)">
+                                🥚 {{ char.dislikes }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="board-footer" v-if="totalPages > 1">
+                <div class="page-btn" :class="{ disabled: currentPage === 1 }" @click="prevPage">← 上一页</div>
+                <div class="page-info">第 {{ currentPage }} / {{ totalPages }} 页</div>
+                <div class="page-jump">
+                    <input type="number" v-model.number="jumpInput" @keyup.enter="jumpToPage" min="1" :max="totalPages">
+                    <button class="btn-chalk btn-jump" @click="jumpToPage">Go</button>
+                </div>
+                <div class="page-btn" :class="{ disabled: currentPage === totalPages }" @click="nextPage">下一页 →</div>
+            </div>
+        </div>
+    </div>
+    {% endverbatim %}
+
+    <script>
+        window.addEventListener('load', function() {
+            // ⭐️ 1. 交互逻辑：防重叠 + 随机特效 ⭐️
+            (function initInteraction() {
+                const penBtn = document.querySelector('.pen-wrapper');
+                const movableItems = document.querySelectorAll('.movable-item');
+                const starRotator = document.querySelector('.star-rotator');
+                let currentStarRotation = 0;
+
+                if (!penBtn || movableItems.length === 0) return;
+
+                // 安全区域配置
+                const safeArea = {
+                    minX: 25, maxX: 95,
+                    minY: 40, maxY: 160
+                };
+                const itemRadius = 30;
+
+                penBtn.addEventListener('mouseenter', () => {
+                    const positions = [];
+                    movableItems.forEach((item) => {
+                        let x, y, overlap;
+                        let attempts = 0;
+                        //do...while 循环，利用勾股定理 (Math.sqrt(...)) 检查新生成的坐标是否会和已有的文字重叠。如果重叠，就重新算，直到找到空位。
+                        do {
+                            overlap = false;
+                            x = safeArea.minX + Math.random() * (safeArea.maxX - safeArea.minX);
+                            y = safeArea.minY + Math.random() * (safeArea.maxY - safeArea.minY);
+
+                            for (let pos of positions) {
+                                const dist = Math.sqrt(Math.pow(x - pos.x, 2) + Math.pow(y - pos.y, 2));
+                                if (dist < itemRadius) { overlap = true; break; }
+                            }
+                            attempts++;
+                        } while (overlap && attempts < 100);
+
+                        positions.push({x, y});
+                        item.style.left = x + 'px';
+                        item.style.top = y + 'px';
+                        item.classList.add('active');
+                    });
+
+                    if (starRotator) {
+                        const randomAngle = 180 + Math.random() * 540;
+                        const dir = Math.random() < 0.5 ? 1 : -1;
+                        currentStarRotation += (randomAngle * dir);
+                        starRotator.style.transform = `rotate(${currentStarRotation}deg)`;
+                    }
+                });
+            })();
+
+            // ⭐️ 2. Vue 应用 ⭐️
+            window.voteApp = new Vue({
+                el: '#vote-app',
+                data: {
+                    characters: [],
+                    currentPage: 1,
+                    pageSize: 16,
+                    jumpInput: '', // 👈 修复1：这里补上了逗号
+                    showReport: false,
+                    reportImage: '',
+                    loadingReport: false,
+                    reportPage: 1, // ⭐️ 新增：当前报表页码，默认为 1
+                },
+                computed: {
+                    totalPages() { return Math.ceil(this.characters.length / this.pageSize); },
+                    paginatedCharacters() {
+                        const start = (this.currentPage - 1) * this.pageSize;
+                        return this.characters.slice(start, start + this.pageSize);
+                    }
+                },
+                methods: {
+                    nextPage() { if (this.currentPage < this.totalPages) this.currentPage++; },
+                    prevPage() { if (this.currentPage > 1) this.currentPage--; },
+
+                    jumpToPage() {
+                        let p = parseInt(this.jumpInput);
+                        if (p >= 1 && p <= this.totalPages) {
+                            this.currentPage = p;
+                            this.jumpInput = '';
+                        } else {
+                            document.getElementById('custom-alert-modal').style.display = 'flex';
+                        }
+                    },
+
+                    openBoard() {
+                        document.getElementById('blackboard-modal').style.display = 'flex';
+                        this.loadCharacters();
+                    },
+                   // 修改这个方法
+                    closeBoard() {
+                        // 原来是直接关闭：document.getElementById('blackboard-modal').style.display = 'none';
+                        // 现在改为：显示确认弹窗
+                        document.getElementById('confirm-close-modal').style.display = 'flex';
+                    },
+
+                    // 真正的关闭 (点击“离开”时触发)
+                    realCloseBoard() {
+                        document.getElementById('blackboard-modal').style.display = 'none';
+                        document.getElementById('confirm-close-modal').style.display = 'none';
+                        // 可选：你可以在这里加一个保存数据的逻辑
+                    },
+
+                    // 取消关闭 (点击“再想想”时触发)
+                    cancelClose() {
+                        document.getElementById('confirm-close-modal').style.display = 'none';
+                    },
+
+                    // ⭐️ 修复2：loadCharacters 方法正确结束
+                    loadCharacters() {
+                        axios.get('/api/vote/list')
+                        .then(res => { this.characters = res.data; this.loadLocalVotes(); })
+                        .catch(err => {
+                            // 如果后端没数据，使用兜底数据
+                            if (this.characters.length === 0) {
+                                // 为了代码简洁，这里省略了很长的数据列表，实际运行保留原有的长列表即可
+                                // 或者你可以确保后端 /api/vote/list 能返回数据
+                                 const fullData = [
+                                    {"id": 1, "name": "郭靖 (肖战饰)", "movie": "射雕英雄传", "likes": 0, "dislikes": 0},
+                                    // ... (由于篇幅原因，如果你后端有数据，这里不写满也没关系；
+                                    // 如果依赖前端数据，请把你原来的长列表贴回来) ...
+                                ];
+                                // 注意：如果你本地没有 backend 数据，请把你之前的 fullData 320个人物列表完整的贴回这里
+                                // this.characters = fullData;
+                                this.loadLocalVotes();
+                            }
+                        });
+                    }, // 👈 注意这里：loadCharacters 结束了，加了逗号
+
+                    // ⭐️ 修复3：openReport 放在 loadCharacters 外面
+                    // 打开报表时，重置为第1页
+                    openReport() {
+                        this.showReport = true;
+                        this.reportPage = 1; // 每次打开都看第一页
+                        this.fetchReport();
+                    },
+
+                    // 上一页
+                    prevReportPage() {
+                        if (this.reportPage > 1) {
+                            this.reportPage--;
+                            this.fetchReport();
+                        }
+                    },
+
+                    // 下一页
+                    nextReportPage() {
+                        if (this.reportPage < 4) {
+                            this.reportPage++;
+                            this.fetchReport();
+                        }
+                    },
+
+                    // 获取报表 (带上 page 参数)
+                    fetchReport() {
+                        this.loadingReport = true;
+                        const startTime = Date.now();
+
+                        // ⭐️ 关键修改：URL 加上 ?page=X
+                        axios.get(`/api/vote/stats?page=${this.reportPage}`)
+                            .then(res => {
+                                if (res.data.status === 'success') {
+                                    this.reportImage = res.data.image;
+                                }
+                            })
+                            .catch(err => {
+                                console.error("图表加载失败", err);
+                            })
+                            .finally(() => {
+                                const duration = Date.now() - startTime;
+                                const minTime = 800;
+                                const waitTime = Math.max(0, minTime - duration);
+                                setTimeout(() => {
+                                    this.loadingReport = false;
+                                }, waitTime);
+                            });
+                    },
+
+                    loadLocalVotes() {
+                        try {
+                            const localData = JSON.parse(localStorage.getItem('char_vote_record') || '{}');
+                            this.characters.forEach(char => {
+                                if (localData[char.id]) {
+                                    char.likes = Math.max(char.likes, localData[char.id].likes || 0);
+                                    char.dislikes = Math.max(char.dislikes, localData[char.id].dislikes || 0);
+                                }
+                            });
+                        } catch(e) {}
+                    },
+                    saveLocalVotes(char) {
+                        try {
+                            const localData = JSON.parse(localStorage.getItem('char_vote_record') || '{}');
+                            localData[char.id] = { likes: char.likes, dislikes: char.dislikes };
+                            localStorage.setItem('char_vote_record', JSON.stringify(localData));
+                        } catch(e) {}
+                    },
+                    vote(char, type, event) {
+                        if (type === 'like') char.likes++; else char.dislikes++;
+                        this.saveLocalVotes(char);
+                        axios.post('/api/vote/action', { id: char.id, type: type }).catch(()=>{});
+                        this.showEffect(type, event);
+                    },
+                    showEffect(type, event) {
+                        const rect = event.target.getBoundingClientRect();
+                        const centerX = rect.left + rect.width / 2;
+                        const centerY = rect.top + rect.height / 2;
+                        let container = document.getElementById('effect-overlay');
+                        if (!container) {
+                            container = document.createElement('div');
+                            container.id = 'effect-overlay';
+                            container.className = 'effect-container';
+                            document.body.appendChild(container);
+                        }
+                        if (type === 'like') {
+                            const el = document.createElement('div');
+                            el.innerHTML = '❤️'; el.className = 'anim-heart-float';
+                            el.style.left = centerX + 'px'; el.style.top = centerY + 'px';
+                            container.appendChild(el); setTimeout(() => el.remove(), 1000);
+                        } else {
+                            this.createRealisticEggSplash(container, centerX, centerY);
+                        }
+                    },
+                    createRealisticEggSplash(container, x, y) {
+                        const white = document.createElement('div');
+                        white.className = 'egg-white-blob';
+                        const r = () => 40 + Math.random() * 30;
+                        white.style.borderRadius = `${r()}% ${r()}% ${r()}% ${r()}% / ${r()}% ${r()}% ${r()}% ${r()}%`;
+                        white.style.width = (60 + Math.random() * 20) + 'px';
+                        white.style.height = (50 + Math.random() * 20) + 'px';
+                        white.style.left = x + 'px'; white.style.top = y + 'px';
+                        white.style.transform = `translate(-50%, -50%) rotate(${Math.random()*360}deg)`;
+                        container.appendChild(white);
+                        const yolk = document.createElement('div');
+                        yolk.className = 'egg-yolk-blob';
+                        yolk.style.left = x + 'px'; yolk.style.top = y + 'px';
+                        container.appendChild(yolk);
+                        setTimeout(() => { white.remove(); yolk.remove(); }, 1200);
+                    }
+                }
+            });
+
+            // 3. 拖拽与点击逻辑 (这部分代码之前被 JS 错误阻塞了，现在应该能运行了)
+            (function initDraggable() {
+                const container = document.getElementById('vote-entry-btn');
+                let isDragging = false, hasMoved = false, startX, startY, initialLeft, initialTop;
+
+                function isValidTarget(target) {
+                    if (target.closest('.pen-wrapper')) return false;
+                    return true;
+                }
+
+                function onDragStart(e) {
+                    if (!isValidTarget(e.target)) return;
+                    const evt = e.touches ? e.touches[0] : e;
+                    isDragging = true; hasMoved = false;
+                    startX = evt.clientX; startY = evt.clientY;
+                    const rect = container.getBoundingClientRect();
+                    initialLeft = rect.left; initialTop = rect.top;
+                    if(e.cancelable && !e.target.closest('.blackboard')) e.preventDefault();
+                }
+
+                function onDragMove(e) {
+                    if (!isDragging) return;
+                    const evt = e.touches ? e.touches[0] : e;
+                    const dx = evt.clientX - startX;
+                    const dy = evt.clientY - startY;
+                    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMoved = true;
+                    let newLeft = initialLeft + dx;
+                    let newTop = initialTop + dy;
+                    const maxLeft = window.innerWidth - container.offsetWidth;
+                    const maxTop = window.innerHeight - container.offsetHeight;
+                    container.style.left = Math.max(0, Math.min(newLeft, maxLeft)) + 'px';
+                    container.style.top = Math.max(0, Math.min(newTop, maxTop)) + 'px';
+                }
+
+                function onDragEnd() {
+                    if (!isDragging) return;
+                    isDragging = false;
+                    // ⭐️ 这里控制点击：如果没有移动，就认为是点击，打开黑板
+                    if (!hasMoved) window.voteApp.openBoard();
+                }
+
+                container.addEventListener('mousedown', onDragStart);
+                window.addEventListener('mousemove', onDragMove);
+                window.addEventListener('mouseup', onDragEnd);
+                container.addEventListener('touchstart', onDragStart, {passive:false});
+                window.addEventListener('touchmove', onDragMove, {passive:false});
+                window.addEventListener('touchend', onDragEnd);
+            })();
+        });
+    </script>
+</body>
+</html>

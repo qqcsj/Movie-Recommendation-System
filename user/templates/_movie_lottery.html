@@ -1,0 +1,1149 @@
+<style>
+/* ---------------------------------- */
+/* 礼物盒 (Cube) 样式 - v25 (不变) */
+/* ---------------------------------- */
+#lottery-box {
+    position: fixed;
+    top: 5rem;
+    right: 2.5rem;
+    cursor: move;
+    z-index: 9998;
+    padding: 20px;
+    border-radius: 4px;
+    transition: box-shadow 0.3s ease-out;
+}
+.lottery-box-scene {
+    width: 80px;
+    height: 80px;
+    perspective: 400px;
+    cursor: pointer;
+    transition: transform 0.3s ease-out;
+}
+.lottery-box-cube {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    transform: rotateX(-20deg) rotateY(-30deg);
+    transition: transform 0.3s ease-out;
+}
+#lottery-box:hover .lottery-box-scene {
+    transform: scale(1.05);
+}
+/* (礼物盒面... 样式保持不变) */
+.lottery-box-face {
+    position: absolute; width: 80px; height: 80px; border: 2px solid #a35b0b; font-size: 40px; font-weight: bold; display: flex; justify-content: center; align-items: center; font-family: 'Arial Black', Gadget, sans-serif; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); user-select: none;
+}
+.lottery-box-front { background: linear-gradient(145deg, #f39c12, #e67e22); transform: translateZ(40px); color: #ffffff; }
+.lottery-box-right { background: linear-gradient(145deg, #d3830a, #ca6c11); transform: rotateY(90deg) translateZ(40px); color: #3498db; }
+.lottery-box-left { background: linear-gradient(145deg, #d3830a, #ca6c11); transform: rotateY(-90deg) translateZ(40px); color: #2ecc71; }
+.lottery-box-back { background: linear-gradient(145deg, #d3830a, #ca6c11); transform: rotateY(180deg) translateZ(40px); color: #e74c3c; }
+.lottery-box-bottom { background: linear-gradient(145deg, #b06209, #9c5508); transform: rotateX(-90deg) translateZ(40px); color: #9b59b6; }
+.lottery-box-top { background: linear-gradient(145deg, #f39c12, #e67e22); transform: rotateX(90deg) translateZ(40px); position: relative; overflow: visible; }
+.ribbon { position: absolute; background: #e74c3c; box-shadow: 0 0 5px rgba(0,0,0,0.3); }
+.ribbon-x { width: 80px; height: 15px; top: 50%; left: 0; transform: translateY(-50%); }
+.ribbon-y { width: 15px; height: 80px; top: 0; left: 50%; transform: translateX(-50%); }
+.bow-knot { position: absolute; width: 18px; height: 18px; background: #c0392b; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%, -50%) translateZ(5px); z-index: 3; border: 2px solid #e74c3c; }
+.bow-loop { position: absolute; width: 30px; height: 40px; background: #e74c3c; border: 3px solid #c0392b; z-index: 2; top: 50%; transform-origin: bottom center; }
+.bow-loop-1 { left: 50%; margin-left: -35px; border-radius: 50% 50% 0 0 / 80% 80% 0 0; transform: translateY(-100%) rotate(-30deg) skewX(10deg) translateZ(3px); }
+.bow-loop-2 { left: 50%; margin-left: 5px; border-radius: 50% 50% 0 0 / 80% 80% 0 0; transform: translateY(-100%) rotate(30deg) skewX(-10deg) translateZ(3px); }
+
+
+/* ---------------------------------- */
+/* 抽奖模态框 - v26 居中修复 (不变) */
+/* ---------------------------------- */
+#lottery-modal {
+    display: block;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 520px;
+    height: 520px;
+    border-radius: 50%;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+    z-index: 9999;
+    background: radial-gradient(circle at center, #2c3e50 0%, #000000 80%);
+    border: 6px solid #1a252f;
+    transform: translate(-50%, -50%) scale(1);
+    cursor: pointer;
+    transition: opacity 0.3s ease-out, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.hidden {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.7);
+    visibility: hidden;
+    pointer-events: none;
+}
+
+/* (背景光晕... 样式保持不变) */
+.modal-bg-particles {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    overflow: hidden;
+    z-index: 1;
+}
+.particle {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0;
+    filter: blur(3px);
+    animation: moveParticle linear infinite;
+}
+@keyframes moveParticle {
+    0% { transform: translate(0, 0); opacity: 0; }
+    20% { opacity: 0.8; }
+    80% { opacity: 0.8; }
+    100% { transform: translate(var(--end-x, 100px), var(--end-y, 100px)); opacity: 0; }
+}
+
+
+/* ---------------------------------- */
+/* 抽奖模态框 - 耳朵 v34 (SVG 融合修改) (不变) */
+/* ---------------------------------- */
+/* ⭐️ 移除旧的 .lottery-close-ear 样式 */
+
+/* ⭐️ 新增: SVG 容器 */
+#lottery-ear-svg-container {
+    position: absolute;
+    /* 尺寸 520px (modal) + (6px border * 2) = 532px */
+    width: 532px;
+    height: 532px;
+    /* 放在模态框上, 覆盖边框 */
+    top: -6px;
+    left: -6px;
+    z-index: 11; /* 确保它在内容 (10) 之下, 在背景 (1) 之上 */
+    /* 允许点击穿透 SVG 画布, 点到下面的模态框 */
+    pointer-events: none;
+    overflow: visible;
+}
+
+/* ⭐️ v16: 修复耳朵点击/悬停事件 ⭐️ */
+g.lottery-svg-ear-group {
+    pointer-events: auto; /* 允许 <g> 元素(耳朵)接收点击事件 */
+    cursor: pointer;      /* 鼠标悬停在 <g> 元素(耳朵)上时显示指针 */
+}
+
+/* ⭐️ 新增: SVG 耳朵路径样式 */
+/* 基础样式 (两个耳朵路径共用) */
+.lottery-svg-ear-outer,
+.lottery-svg-ear-inner {
+    stroke: none;
+    transition: fill 0.2s ease;
+}
+
+/* 外耳 (深色) */
+.lottery-svg-ear-outer {
+    /* ⭐️ v2 修改: 改为模态框的边框颜色 */
+    fill: #1a252f;
+}
+
+/* 内耳 (浅色) */
+.lottery-svg-ear-inner {
+    /* ⭐️ v2 修改: 改为模态框的主背景颜色 */
+    fill: #2c3e50;
+}
+
+
+/* 悬停效果 (让两个部分都变亮) */
+g.lottery-svg-ear-group:hover .lottery-svg-ear-outer {
+    fill: #34495e; /* 外耳变成内耳的(旧)颜色 */
+}
+
+g.lottery-svg-ear-group:hover .lottery-svg-ear-inner {
+    fill: #4a657c; /* 内耳变成更亮的颜色 (来自确认按钮) */
+}
+
+/* (v21 header 保持不变) */
+#lottery-modal-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    z-index: 0;
+}
+
+/* (v22 内容... 样式保持不变) */
+.lottery-modal-content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    /* ⭐️ v10: 基于你文件的 padding */
+    padding: 3.8em 2rem 2rem 2rem;
+    z-index: 12;
+
+    /* ⭐️ 第 2 步: 添加 pointer-events */
+    pointer-events: none; /* 让整个内容区域(包括标题)对鼠标"透明" */
+
+    box-sizing: border-box;
+}
+
+/* ⭐️ 新增: 重新启用内容区域的点击 ⭐️ */
+/*
+  因为上一步我们让整个 .lottery-modal-content (z-index: 12) 都"点击穿透"了,
+  现在我们必须"手动"让需要被点击的 按钮列表 和 结果卡片 重新"捕捉"点击。
+
+  我们故意不包括 h2, 所以 h2 标题将保持 "点击穿透" 状态。
+*/
+.lottery-category-list,
+#lottery-result {
+    pointer-events: auto;
+}
+
+/* ⭐️ v15 修改: 渐变 + 彩虹脉冲光晕 ⭐️ (不变) */
+#lottery-modal h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+
+    /* 1. 渐变色 (不变) */
+    background: linear-gradient(90deg, #00c6ff, #ecf0f1, #f1c40f);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+
+    margin-bottom: 24px;
+
+    /* 2. 移除 text-shadow (不变) */
+    text-shadow: none;
+
+    /* 3. 应用动画 (不变) */
+    animation: pulse-glow-filter 3s ease-in-out infinite;
+
+    /* 4. ⭐️ 更新初始状态以匹配新的 0% 动画 ⭐️ */
+    filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5))
+            drop-shadow(-2px -2px 3px rgba(0, 198, 255, 0.3))   /* 弱 蓝 */
+            drop-shadow(2px -2px 3px rgba(241, 196, 15, 0.3))  /* 弱 黄 */
+            drop-shadow(-2px 2px 3px rgba(46, 204, 113, 0.3))  /* 弱 绿 */
+            drop-shadow(2px 2px 3px rgba(231, 76, 60, 0.3))     /* 弱 红 */
+            drop-shadow(-3px 0 3px rgba(155, 89, 182, 0.3))  /* 弱 紫 */
+            drop-shadow(3px 0 3px rgba(255, 105, 180, 0.3)); /* 弱 粉 */
+}
+
+/* (列表和按钮... 样式保持不变) */
+.lottery-category-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto;
+
+ }
+.lottery-category-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    /* ⭐️ 步骤 2: 恢复你想要的半透明背景 ⭐️ */
+    background-color: rgba(255, 255, 255, 0.05);
+
+    padding: 8px 12px;
+    border-radius: 99px;
+ }
+.lottery-category-item span {
+    color: #bdc3c7;
+    font-size: 0.9rem;
+
+    /* 新增: 我们在这里(而不是在 <strong> 上)应用裁剪 */
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent; /* 这会让“优秀”和“(8.5分以上)”都透明 */
+}
+.lottery-category-item span strong {
+    font-weight: 600;
+    min-width: 60px;
+    display: inline-block;
+
+
+ }
+
+ /* ⭐️ 第 3 步: 替换下面所有规则, 目标改为 'span' ⭐️ */
+
+/* 1. 优秀 (8.5分以上): 蓝 -> (亮薄荷色) -> 绿 */
+.lottery-category-item:nth-child(1) span {
+    background-image: linear-gradient(to right, #00c6ff, #00ffaa, #2ecc71);
+}
+
+/* 2. 推荐 (7.5-8.4分): 绿 -> (亮黄色) -> 黄 */
+.lottery-category-item:nth-child(2) span {
+    background-image: linear-gradient(to right, #2ecc71, #c8e65e, #f1c40f);
+}
+
+/* 3. 合格 (6.5-7.4分): 黄 -> (亮橙色) -> 橙 */
+.lottery-category-item:nth-child(3) span {
+    background-image: linear-gradient(to right, #f1c40f, #f39c12, #e67e22);
+}
+
+/* 4. 平庸 (5.5-6.4分): 橙 -> (亮红色) -> 红 */
+.lottery-category-item:nth-child(4) span {
+    background-image: linear-gradient(to right, #e67e22, #e7602f, #e74c3c);
+}
+
+/* 5. 烂片 (5.4分以下): 红 -> (亮粉色) -> 粉 */
+.lottery-category-item:nth-child(5) span {
+    background-image: linear-gradient(to right, #e74c3c, #f05a7a, #ff69b4);
+}
+
+.lottery-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+.lottery-btn-draw {
+    background: linear-gradient(135deg, #00c6ff, #f1c40f);
+    color: white;
+}
+.lottery-btn-draw:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 10px rgba(241, 196, 15, 0.3);
+}
+#lottery-result {
+    margin-top: 25px;
+    min-height: 160px;
+    display: none;
+    width: 100%;
+    max-width: 300px;
+ }
+.lottery-movie-result-card {
+    display: flex;
+    align-items: flex-start;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.lottery-movie-poster-real {
+    width: 80px;
+    height: 120px;
+    border-radius: 8px;
+    object-fit: cover;
+    margin-right: 12px;
+    flex-shrink: 0;
+    background: #34495e;
+}
+.lottery-movie-info {
+    display: flex;
+    flex-direction: column;
+    color: #ecf0f1;
+    overflow: hidden;
+}
+.lottery-movie-title-real {
+    font-weight: bold;
+    font-size: 1.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 8px;
+    color: #f1c40f;
+}
+.lottery-movie-rating {
+    font-size: 1rem;
+    color: #bdc3c7;
+    font-weight: 600;
+ }
+.lottery-movie-rating span {
+    font-size: 1.1rem;
+    color: #ffffff;
+ }
+
+
+/* (v20 确认弹窗... 样式保持不变) */
+#lottery-confirm-modal {
+    display: block;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 360px;
+    z-index: 10000;
+    background: linear-gradient(145deg, #000022, #000000 70%);
+    border: 2px solid #3498db;
+    border-radius: 12px;
+    padding: 24px 30px;
+    box-shadow: 0 10px 30px rgba(0, 114, 255, 0.3);
+    text-align: center;
+    transition: opacity 0.3s ease-out, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+#lottery-confirm-modal p {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin: 0 0 24px 0;
+    line-height: 1.5;
+    background: linear-gradient(90deg, #0072ff, #f1c40f, #e74c3c, #2ecc71);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+.lottery-confirm-buttons {
+    display: flex;
+    justify-content: space-around;
+    gap: 16px;
+}
+.lottery-confirm-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+.lottery-confirm-btn:hover {
+    transform: translateY(-2px);
+}
+#lottery-confirm-yes {
+    background: linear-gradient(135deg, #00c6ff, #0072ff);
+    color: white;
+}
+#lottery-confirm-yes:hover {
+    box-shadow: 0 6px 10px rgba(0, 114, 255, 0.3);
+}
+#lottery-confirm-no {
+    background: #34495e;
+    color: #ecf0f1;
+    border: 1px solid #4a657c;
+}
+#lottery-confirm-no:hover {
+    background: #4a657c;
+    box-shadow: 0 6px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* ⭐️ v15: 动画 (不变) ⭐️ */
+@keyframes pulse-glow-filter {
+    0% {
+        /* 基础阴影 + 弱彩虹光晕 */
+        filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5))
+                drop-shadow(-2px -2px 3px rgba(0, 198, 255, 0.3))   /* 蓝 */
+                drop-shadow(2px -2px 3px rgba(241, 196, 15, 0.3))  /* 黄 */
+                drop-shadow(-2px 2px 3px rgba(46, 204, 113, 0.3))  /* 绿 */
+                drop-shadow(2px 2px 3px rgba(231, 76, 60, 0.3))     /* 红 */
+                drop-shadow(-3px 0 3px rgba(155, 89, 182, 0.3))  /* 紫 */
+                drop-shadow(3px 0 3px rgba(255, 105, 180, 0.3)); /* 粉 */
+    }
+    50% {
+        /* 基础阴影 + 强彩虹光晕 */
+        filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5))
+                drop-shadow(-4px -4px 8px rgba(0, 198, 255, 0.8))   /* 强 蓝 */
+                drop-shadow(4px -4px 8px rgba(241, 196, 15, 0.7))  /* 强 黄 */
+                drop-shadow(-4px 4px 8px rgba(46, 204, 113, 0.7))  /* 强 绿 */
+                drop-shadow(4px 4px 8px rgba(231, 76, 60, 0.7))     /* 强 红 */
+                drop-shadow(-6px 0 8px rgba(155, 89, 182, 0.7))  /* 强 紫 */
+                drop-shadow(6px 0 8px rgba(255, 105, 180, 0.7)); /* 强 粉 */
+    }
+    100% {
+        /* 基础阴影 + 弱彩虹光晕 */
+        filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5))
+                drop-shadow(-2px -2px 3px rgba(0, 198, 255, 0.3))   /* 蓝 */
+                drop-shadow(2px -2px 3px rgba(241, 196, 15, 0.3))  /* 黄 */
+                drop-shadow(-2px 2px 3px rgba(46, 204, 113, 0.3))  /* 绿 */
+                drop-shadow(2px 2px 3px rgba(231, 76, 60, 0.3))     /* 红 */
+                drop-shadow(-3px 0 3px rgba(155, 89, 182, 0.3))  /* 紫 */
+                drop-shadow(3px 0 3px rgba(255, 105, 180, 0.3)); /* 粉 */
+    }
+}
+
+
+/* ---------------------------------- */
+/* ⭐️ 烟花动画 (与上一版相同, 保持不变) ⭐️ */
+/* ---------------------------------- */
+
+.firework-container {
+    position: absolute;
+    width: 1px; /* 爆炸中心点 */
+    height: 1px;
+    z-index: 100;
+    pointer-events: none; /* 让鼠标可以穿透, 不会挡住其他东西 */
+    /* JavaScript会设置 top/left 来定位它 */
+}
+
+.firework-spark {
+    position: absolute;
+    /* ⭐️ width/height 均由 JS 动态设置 */
+    background: #fff; /* JS 会覆盖它 */
+    border-radius: 1px;
+    box-shadow: 0 0 4px var(--color); /* (保持辉光不变) */
+    top: 0;
+    left: 0;
+    transform-origin: 0% 50%;
+    opacity: 0;
+
+    /* ⭐️ 动画的所有参数都由 JS 的 CSS 变量控制 */
+    animation: firework-explode var(--duration) var(--curve) var(--delay) forwards;
+}
+
+/* ⭐️ “坠落火花”样式 (保持 1.5px 不变) ⭐️ */
+.firework-ember {
+    position: absolute;
+    width: 1.5px;
+    height: 1.5px;
+    background: #f1c40f; /* 它们是黄/橙色 */
+    border-radius: 50%;
+    box-shadow: 0 0 2px #f1c40f, 0 0 4px #e67e22;
+    top: 0;
+    left: 0;
+    transform-origin: 0% 50%;
+    opacity: 0;
+
+    /* ⭐️ 动画的所有参数都由 JS 的 CSS 变量控制 */
+    animation: firework-fall var(--duration) var(--curve) var(--delay) forwards;
+}
+
+
+/* ⭐️ "主体" (Sparks) 炸开, 不坠落! (不变) ⭐️ */
+@keyframes firework-explode {
+    0% {
+        transform: rotate(var(--angle)) translateX(0px) translateY(0px) scale(0.3);
+        opacity: 1;
+    }
+    50% {
+        /* 增加一个中间帧, 让爆炸/消失更自然 */
+        opacity: 1;
+    }
+    100% {
+        /* * 关键:
+         * 1. translateX(var(--distance)) - 飞出去
+         * 2. translateY(0px) - (!!!!) 不再坠落 (!!!!)
+         * 3. scale(0.1) - (!!!!) 固定缩小消失 (!!!!)
+        */
+        transform: rotate(var(--angle))
+                   translateX(var(--distance))
+                   translateY(0px) /* <-- 不坠落! */
+                   scale(0.1);       /* <-- 缩小消失! */
+        opacity: 0; /* 坠落过程中消失 */
+    }
+}
+
+/* ⭐️ "粒子" (Embers) 炸开, 并且随机坠落! (不变) ⭐️ */
+@keyframes firework-fall {
+    0% {
+        transform: rotate(var(--angle)) translateX(0px) translateY(0px) scale(0.5);
+        opacity: 1;
+    }
+    100% {
+        /*
+         * (保持不变)
+         * 1. translateX(var(--distance)) - 飞出去
+         * 2. translateY(var(--gravity)) - (!!!!) 随机坠落 (!!!!)
+         * 3. scale(var(--scale)) - (!!!!) 随机缩小 (!!!!)
+        */
+        transform: rotate(var(--angle))
+                   translateX(var(--distance))
+                   translateY(var(--gravity))
+                   scale(var(--scale));
+        opacity: 0;
+    }
+}
+
+</style>
+
+
+<div id="lottery-box">
+    <div class="lottery-box-scene">
+        <div class="lottery-box-cube">
+            <div class="lottery-box-face lottery-box-front">?</div>
+            <div class="lottery-box-face lottery-box-back">?</div>
+            <div class="lottery-box-face lottery-box-right">?</div>
+            <div class="lottery-box-face lottery-box-left">?</div>
+            <div class="lottery-box-face lottery-box-bottom">?</div>
+            <div class="lottery-box-face lottery-box-top">
+                <div class="ribbon ribbon-x"></div>
+                <div class="ribbon ribbon-y"></div>
+                <div class="bow-loop bow-loop-1"></div>
+                <div class="bow-loop bow-loop-2"></div>
+                <div class="bow-knot"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="lottery-modal" class="hidden">
+    <div class="modal-bg-particles"></div>
+
+    <svg id="lottery-ear-svg-container" viewBox="0 0 532 532" xmlns="http://www.w3.org/2000/svg">
+
+        <g id="svg-ear-left" class="lottery-svg-ear-group">
+            <path class="lottery-svg-ear-outer"
+                  d="M 175 16
+                     C 120 -50, -20 60, 36 133
+                     A 266 266 0 0 0 175 16
+                     Z" />
+            <path class="lottery-svg-ear-inner"
+                  d="M 133 45.6
+                     C 100 10, 20 70, 62.3 95.1
+                     A 260 260 0 0 0 133 45.6
+                     Z" />
+        </g>
+
+        <g id="svg-ear-right" class="lottery-svg-ear-group">
+            <path class="lottery-svg-ear-outer"
+                  d="M 357 25
+                     C 412 -35, 552 85, 496 150
+                     A 266 266 0 0 1 357 25
+                     Z" />
+            <path class="lottery-svg-ear-inner"
+                  d="M 399 40.6
+                     C 432 20, 512 90, 469.7 110.1
+                     A 260 260 0 0 1 399 40.6
+                     Z" />
+        </g>
+    </svg>
+
+
+    <div id="lottery-modal-header" class="z-0"></div>
+
+    <div class="lottery-modal-content z-10">
+       <h2>今天准备看什么电影呢？ </h2>
+        <div class="lottery-category-list">
+            <div class="lottery-category-item">
+                <span><strong>优秀</strong> (8.5分以上)</span>
+                <button class="lottery-btn lottery-btn-draw" data-category="excellent">抽!</button>
+            </div>
+            <div class="lottery-category-item">
+                <span><strong>推荐</strong> (7.5-8.4分)</span>
+                <button class="lottery-btn lottery-btn-draw" data-category="recommended">抽!</button>
+            </div>
+            <div class="lottery-category-item">
+                <span><strong>合格</strong> (6.5-7.4分)</span>
+                <button class="lottery-btn lottery-btn-draw" data-category="pass">抽!</button>
+            </div>
+            <div class="lottery-category-item">
+                <span><strong>平庸</strong> (5.5-6.4分)</span>
+                <button class="lottery-btn lottery-btn-draw" data-category="mediocre">抽!</button>
+            </div>
+            <div class="lottery-category-item">
+                <span><strong>烂片</strong> (5.4分以下)</span>
+                <button class="lottery-btn lottery-btn-draw" data-category="bad">抽!</button>
+            </div>
+        </div>
+        <div id="lottery-result">
+            </div>
+    </div>
+</div>
+
+<div id="lottery-confirm-modal" class="hidden">
+    <p>你确定选好了想看的电影了吗？</p>
+    <div class="lottery-confirm-buttons">
+        <button id="lottery-confirm-no" class="lottery-confirm-btn">再想想</button>
+        <button id="lottery-confirm-yes" class="lottery-confirm-btn">选好了</button>
+    </div>
+</div>
+
+
+<script>
+/* ==============
+   JavaScript
+   (已按“按钮亮色”要求修改)
+   ==============
+*/
+document.addEventListener('DOMContentLoaded', function() {
+
+    // --- 元素获取 (v33 - ⭐️ 已更新 ⭐️) (不变) ---
+    const lotteryBox = document.getElementById('lottery-box');
+    const cubeScene = document.querySelector('.lottery-box-scene');
+    const cube = document.querySelector('.lottery-box-cube');
+    const lotteryModal = document.getElementById('lottery-modal');
+
+    // ⭐️ 更新: 现在获取 SVG 耳朵
+    const closeEarLeft = document.getElementById('svg-ear-left');
+    const closeEarRight = document.getElementById('svg-ear-right');
+
+    const drawButtons = document.querySelectorAll('.lottery-btn-draw');
+    const resultDiv = document.getElementById('lottery-result');
+    const lotteryConfirmModal = document.getElementById('lottery-confirm-modal');
+    const confirmYesBtn = document.getElementById('lottery-confirm-yes');
+    const confirmNoBtn = document.getElementById('lottery-confirm-no');
+
+    const API_URL = '/api/draw_movie';
+    let selectedCategory = null;
+
+    // --- (核心功能: drawMovie... 保持不变) ---
+    async function drawMovie() {
+        if (!selectedCategory) return;
+        let movie;
+        try {
+            const response = await fetch(`${API_URL}?category=${selectedCategory}`);
+            if (!response.ok) { throw new Error(`Network response was not ok (${response.status})`); }
+            movie = await response.json();
+            if (!movie || typeof movie.id === 'undefined' || !movie.name || typeof movie.rating === 'undefined' || typeof movie.image_link === 'undefined') {
+                console.error('Invalid movie data received from API:', movie);
+                throw new Error('Invalid data format from server');
+            }
+        } catch (error) {
+            console.error("Fetch error:", error);
+            movie = { id: 0, name: "抽奖机开小差了...", rating: "??", image_link: null };
+        }
+        const movieUrl = (movie.id === 0) ? '#' : `/movie/${movie.id}`;
+        const posterUrl = movie.image_link ? movie.image_link : 'https://placehold.co/80x120/34495e/95a5a6?text=No+Image';
+        resultDiv.innerHTML = `
+            <p style="color: #95a5a6; font-size: 0.9rem; margin-bottom: 8px;">为您抽中：</p>
+            <div class="lottery-movie-result-card">
+                <a href="${movieUrl}" target="_blank">
+                    <img src="${posterUrl}" alt="${movie.name}" class="lottery-movie-poster-real"
+                         onerror="this.src='https://placehold.co/80x120/34495e/95a5a6?text=Error'; this.onerror=null;">
+                </a>
+                <div class="lottery-movie-info">
+                    <a href="${movieUrl}" target="_blank" style="text-decoration: none;">
+                        <div class="lottery-movie-title-real" title="${movie.name}">${movie.name}</div>
+                    </a>
+                    <div class="lottery-movie-rating">
+                        评分: <span>${movie.rating}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        resultDiv.style.display = 'block';
+    }
+
+    // --- ⭐️ 弹窗辅助函数 (已修改) ⭐️ ---
+    function openModal() {
+        lotteryModal.classList.remove('hidden');
+    }
+
+    function closeModal() {
+        lotteryModal.classList.add('hidden');
+
+        if (lotteryModal.resetDragPosition) {
+            lotteryModal.resetDragPosition();
+        }
+
+        // ⭐️ 关键修改: 关闭模态框时, 重置所有按钮颜色
+        drawButtons.forEach(btn => {
+            btn.style.color = 'white';
+        });
+    }
+
+    // --- (v19 背景光晕... 保持不变) ---
+    function createParticles() {
+        const container = document.querySelector('.modal-bg-particles');
+        if (!container) return;
+        if (container.children.length > 0) return;
+        const colors = ['#00c6ff', '#f1c40f', '#3498db', '#e67e22'];
+        const numParticles = 30;
+        for (let i = 0; i < numParticles; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            const size = Math.random() * 8 + 2;
+            const x = Math.random() * 520;
+            const y = Math.random() * 520;
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            const endX = (Math.random() - 0.5) * 400;
+            const endY = (Math.random() - 0.5) * 400;
+            const duration = Math.random() * 10 + 8;
+            const delay = Math.random() * 8;
+            particle.style.width = `${size}px`;
+            particle.style.height = `${size}px`;
+            particle.style.left = `${x}px`;
+            particle.style.top = `${y}px`;
+            particle.style.background = color;
+            particle.style.boxShadow = `0 0 5px ${color}, 0 0 10px ${color}`;
+            particle.style.setProperty('--end-x', `${endX}px`);
+            particle.style.setProperty('--end-y', `${endY}px`);
+            particle.style.animationDuration = `${duration}s`;
+            particle.style.animationDelay = `${delay}s`;
+            container.appendChild(particle);
+        }
+    }
+
+
+
+    /* ---------------------------------- */
+    /* ⭐️ 烟花函数 (与上一版相同, 保持不变) ⭐️ */
+    /* ---------------------------------- */
+    function showFirework(buttonEl) {
+        const category = buttonEl.dataset.category;
+        let colors = [];
+
+        // 1. (不变) 设置颜色
+        switch (category) {
+            case 'excellent': colors = ['#00c6ff', '#2ecc71']; break;
+            case 'recommended': colors = ['#2ecc71', '#f1c40f']; break;
+            case 'pass': colors = ['#f1c40f', '#e67e22']; break;
+            case 'mediocre': colors = ['#e67e22', '#e74c3c']; break;
+            case 'bad': colors = ['#e74c3c', '#ff69b4']; break;
+            default: colors = ['#ffffff', '#bbbbbb'];
+        }
+
+        const modalContent = document.querySelector('.lottery-modal-content');
+        if (!modalContent) return;
+
+        // 2. ⭐️ (保持不变) 计算位置 (依然上移 15px) ⭐️
+        const buttonRect = buttonEl.getBoundingClientRect();
+        const contentRect = modalContent.getBoundingClientRect();
+        // ⭐️ (保持不变) 额外减去 15px 来上移烟花 ⭐️
+        const top = buttonRect.top - contentRect.top + (buttonRect.height / 2) - 15;
+        const left = buttonRect.left - contentRect.left + buttonRect.width + 30;
+
+        // 3. (不变) 创建容器
+        const container = document.createElement('div');
+        container.className = 'firework-container';
+        container.style.top = `${top}px`;
+        container.style.left = `${left}px`;
+
+        // ⭐️ (保持不变) 定义随机曲线
+        const curves = [
+            'cubic-bezier(0.2, 0.8, 0.7, 1.0)', /* 默认, 爆炸快 */
+            'cubic-bezier(0.4, 0.5, 0.7, 1.0)', /* 均衡 */
+            'cubic-bezier(0.6, 0.2, 0.7, 1.0)'  /* 重力感强, 坠落快 */
+        ];
+
+        // 4. ⭐️ (保持不变) "主体/粒子" 分离逻辑 ⭐️
+
+        // --- A. 创建主要火花 (Sparks) ---
+        const numSparks = 12;
+        const angleIncrement = 360 / numSparks;
+        for (let i = 0; i < numSparks; i++) {
+            const spark = document.createElement('div');
+            spark.className = 'firework-spark';
+
+            const height = Math.random() * 1.5 + 1;
+            const angle = i * angleIncrement;
+            const color = colors[i % 2];
+
+            // ⭐️ (保持不变) "主体" 快速炸开 (0.8s-1.6s) ⭐️
+            const duration = Math.random() * 800 + 800;
+            // ⭐️ (保持不变) 爆发集中 (0 - 50ms) ⭐️
+            const delay = Math.random() * 50;
+            const curve = curves[Math.floor(Math.random() * curves.length)];
+            // ⭐️ (保持不变) "主体" 飞得远 (50px-100px) ⭐️
+            const distance = Math.random() * 50 + 50;
+
+            const length = Math.random() * 20 + 20;
+
+            spark.style.setProperty('--angle', `${angle}deg`);
+            spark.style.setProperty('--color', color);
+            spark.style.background = color;
+            spark.style.width = `${length}px`;
+            spark.style.height = `${height}px`;
+
+            spark.style.setProperty('--duration', `${duration}ms`);
+            spark.style.setProperty('--delay', `${delay}ms`);
+            spark.style.setProperty('--curve', curve);
+            spark.style.setProperty('--distance', `${distance}px`);
+
+            container.appendChild(spark);
+        }
+
+        // --- B. ⭐️ 创建“坠落火花” (Embers) ---
+        const numEmbers = 60;
+        for (let i = 0; i < numEmbers; i++) {
+            const ember = document.createElement('div');
+            ember.className = 'firework-ember';
+
+            const angle = Math.random() * 360;
+
+            // ⭐️ (保持不变) "粒子" 缓慢坠落 ⭐️
+            const duration = Math.random() * 1500 + 3800; // 3.8s - 5.3s
+            const delay = Math.random() * 50; // (0 - 50ms)
+            const curve = curves[Math.floor(Math.random() * curves.length)];
+            const distance = Math.random() * 50 + 40; // 粒子飞 (40px - 90px)
+            const gravity = Math.random() * 40 + 80;  // 坠落 80px - 120px
+            const scale = Math.random() * 0.3 + 0.2;  // 最终缩放 0.2 - 0.5
+
+            ember.style.setProperty('--angle', `${angle}deg`);
+
+            ember.style.setProperty('--duration', `${duration}ms`);
+            ember.style.setProperty('--delay', `${delay}ms`);
+            ember.style.setProperty('--curve', curve);
+            ember.style.setProperty('--distance', `${distance}px`);
+            ember.style.setProperty('--gravity', `${gravity}px`);
+            ember.style.setProperty('--scale', `${scale}`);
+
+            container.appendChild(ember);
+        }
+
+        // 5. (不变) 添加到 DOM
+        modalContent.appendChild(container);
+
+        // 6. ⭐️ (保持不变) 5.5 秒后移除 ⭐️
+        setTimeout(() => {
+            container.remove();
+        }, 5500);
+    }
+
+
+    // ⭐️⭐️⭐️ 新函数：专门用于 Modal 弹窗的拖拽 (v26) (不变) ⭐️⭐️⭐️
+    function setupModalDraggable(elmnt, handle, cursorStyle) {
+        let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+        let startX = 0, startY = 0;
+        let isDragging = false;
+        const dragThreshold = 5;
+        let currentTranslateX = 0;
+        let currentTranslateY = 0;
+
+        elmnt.resetDragPosition = () => {
+            currentTranslateX = 0;
+            currentTranslateY = 0;
+            elmnt.style.transform = '';
+        };
+
+        handle.onmousedown = dragMouseDown;
+
+        function dragMouseDown(e) {
+            e = e || window.event;
+            // ⭐️ 更新 (v33): 检查 SVG 耳朵
+            if (e.target.closest('.lottery-svg-ear-group')) {
+                return;
+            }
+            pos3 = e.clientX;
+            pos4 = e.clientY;
+            startX = e.clientX;
+            startY = e.clientY;
+            isDragging = false;
+            document.onmouseup = closeDragElement;
+            document.onmousemove = elementDrag;
+        }
+
+        function elementDrag(e) {
+            e = e || window.event;
+            if (!isDragging) {
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                if (Math.sqrt(dx*dx + dy*dy) > dragThreshold) {
+                    isDragging = true;
+                    document.body.style.cursor = 'grabbing';
+                    handle.style.cursor = 'grabbing';
+                    e.preventDefault();
+                } else {
+                    return;
+                }
+            }
+            e.preventDefault();
+            pos1 = pos3 - e.clientX;
+            pos2 = pos4 - e.clientY;
+            pos3 = e.clientX;
+            pos4 = e.clientY;
+            currentTranslateX -= pos1;
+            currentTranslateY -= pos2;
+            const elWidth = elmnt.offsetWidth, elHeight = elmnt.offsetHeight;
+            const winWidth = window.innerWidth, winHeight = window.innerHeight;
+            const centerX = (winWidth / 2) + currentTranslateX;
+            const centerY = (winHeight / 2) + currentTranslateY;
+            let newLeft = centerX - (elWidth / 2);
+            let newTop = centerY - (elHeight / 2);
+            if (newLeft < 0) { currentTranslateX -= newLeft; }
+            if (newTop < 0) { currentTranslateY -= newTop; }
+            if (newLeft + elWidth > winWidth) { currentTranslateX -= (newLeft + elWidth - winWidth); }
+            if (newTop + elHeight > winHeight) { currentTranslateY -= (newTop + elHeight - winHeight); }
+            elmnt.style.transform = `translate(-50%, -50%) translate(${currentTranslateX}px, ${currentTranslateY}px) scale(1)`;
+        }
+
+        function closeDragElement() {
+            document.body.style.cursor = 'default';
+            handle.style.cursor = cursorStyle;
+            isDragging = false;
+            document.onmouseup = null;
+            document.onmousemove = null;
+        }
+    }
+
+
+    // --- ⭐️ 功能 1: 拖拽移动 (v25 - 逻辑修复) ⭐️ (不变) ---
+    // (用于 礼物盒Padding)
+    function setupDraggable(elmnt, handle, cursorStyle) {
+        let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+        let startX = 0, startY = 0;
+        let isDragging = false;
+        const dragThreshold = 5;
+        handle.onmousedown = dragMouseDown;
+        function dragMouseDown(e) {
+            e = e || window.event;
+            if (handle === lotteryModal) {
+                // ⭐️ 更新 (v33): 检查 SVG 耳朵
+                if (e.target.closest('.lottery-svg-ear-group')) {
+                    return;
+                }
+            }
+            if (handle === lotteryBox && e.target.closest('.lottery-box-scene')) {
+                return;
+            }
+            pos3 = e.clientX;
+            pos4 = e.clientY;
+            startX = e.clientX;
+            startY = e.clientY;
+            isDragging = false;
+            document.onmouseup = closeDragElement;
+            document.onmousemove = elementDrag;
+        }
+
+        function elementDrag(e) {
+            e = e || window.event;
+            if (!isDragging) {
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                if (Math.sqrt(dx*dx + dy*dy) > dragThreshold) {
+                    isDragging = true;
+                    document.body.style.cursor = 'grabbing';
+                    handle.style.cursor = 'grabbing';
+                    e.preventDefault();
+                } else {
+                    return;
+                }
+            }
+            e.preventDefault();
+            pos1 = pos3 - e.clientX;
+            pos2 = pos4 - e.clientY;
+            pos3 = e.clientX;
+            pos4 = e.clientY;
+            let newTop = elmnt.offsetTop - pos2;
+            let newLeft = elmnt.offsetLeft - pos1;
+            const winWidth = window.innerWidth, winHeight = window.innerHeight;
+            const elWidth = elmnt.offsetWidth, elHeight = elmnt.offsetHeight;
+            if (newTop < 0) newTop = 0;
+            if (newLeft < 0) newLeft = 0;
+            if (newTop + elHeight > winHeight) newTop = winHeight - elHeight;
+            if (newLeft + elWidth > winWidth) newLeft = winWidth - elWidth;
+            elmnt.style.top = newTop + "px";
+            elmnt.style.left = newLeft + "px";
+        }
+        function closeDragElement() {
+            document.body.style.cursor = 'default';
+            handle.style.cursor = cursorStyle;
+            isDragging = false;
+            document.onmouseup = null;
+            document.onmousemove = null;
+        }
+    }
+
+    // --- ⭐️ 功能 2: 拖拽旋转 + 单击打开 (v18 - 保持不变) ⭐️ ---
+    function setupRotatableAndClick(handle, cubeToRotate) {
+        let isDragging = false;
+        let startX = 0, startY = 0;
+        let lastX = 0, lastY = 0;
+        let rotX = -20, rotY = -30;
+        const dragThreshold = 5;
+        handle.onmousedown = function(e) {
+            e = e || window.event;
+            startX = e.clientX;
+            startY = e.clientY;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            isDragging = false;
+            rotX = -20;
+            rotY = -30;
+            document.onmouseup = stopRotationOrClick;
+            document.onmousemove = rotateCube;
+        };
+
+
+
+        function rotateCube(e) {
+            e = e || window.event;
+            if (!isDragging) {
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                if (Math.sqrt(dx*dx + dy*dy) > dragThreshold) {
+                    isDragging = true;
+                    document.body.style.cursor = 'grabbing';
+                    handle.style.cursor = 'grabbing';
+                    e.preventDefault();
+                } else {
+                    return;
+                }
+            }
+            e.preventDefault();
+            let dX = e.clientX - lastX;
+            let dY = e.clientY - lastY;
+            rotY += dX * 0.5;
+            rotX -= dY * 0.5;
+            cubeToRotate.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+            lastX = e.clientX;
+            lastY = e.clientY;
+        }
+
+        function stopRotationOrClick(e) {
+            if (isDragging) {
+                cubeToRotate.style.transform = '';
+            } else {
+                e.stopPropagation();
+                openModal();
+                createParticles();
+            }
+            isDragging = false;
+            document.body.style.cursor = 'default';
+            handle.style.cursor = 'pointer';
+            document.onmouseup = null;
+            document.onmousemove = null;
+        }
+    }
+
+
+    // --- ⭐️ 功能 3: 弹窗内部交互 (已修改) ⭐️ ---
+    function setupModalInteractions(modal) {
+        function showConfirmation(e) {
+            e.stopPropagation();
+            lotteryConfirmModal.classList.remove('hidden');
+        }
+        // ⭐️ v33: 监听新的 SVG 耳朵
+        if (closeEarRight) {
+            closeEarRight.addEventListener('click', showConfirmation);
+        }
+        if (closeEarLeft) {
+            closeEarLeft.addEventListener('click', showConfirmation);
+        }
+
+
+        drawButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.stopPropagation();
+
+                // ⭐️ 关键修改 1: 重置所有按钮为白色
+                drawButtons.forEach(btn => {
+                    btn.style.color = 'white';
+                });
+
+                selectedCategory = button.dataset.category;
+                resultDiv.style.display = 'none';
+
+                // ⭐️ 关键修改 2: 根据 data-category 设置被点击按钮的颜色
+                let newColor = 'white';
+                switch (selectedCategory) {
+                    // ⭐️⭐️ 修改: 使用更亮的颜色 ⭐️⭐️
+                    case 'excellent': newColor = '#00ffaa'; break; // 亮薄荷色
+                    case 'recommended': newColor = '#c8e65e'; break; // 亮黄绿
+                    case 'pass': newColor = '#f1c40f'; break; // 黄
+                    case 'mediocre': newColor = '#e67e22'; break; // 橙
+                    case 'bad': newColor = '#e74c3c'; break; // 红
+                }
+                button.style.color = newColor; // 'button' 就是被点击的那个
+
+                showFirework(button); // (烟花功能不变)
+                drawMovie();
+            });
+        });
+    }
+
+    // --- ⭐️ 功能 4: 确认弹窗的按钮逻辑 (v20 - 保持不变) ⭐️ ---
+    function setupConfirmationModal() {
+        confirmYesBtn.onclick = (e) => {
+            e.stopPropagation();
+            lotteryConfirmModal.classList.add('hidden');
+            closeModal();
+        };
+        confirmNoBtn.onclick = (e) => {
+            e.stopPropagation();
+            lotteryConfirmModal.classList.add('hidden');
+        };
+    }
+
+
+    // --- 启动所有功能 (v26 修复) (不变) ---
+    setupDraggable(lotteryBox, lotteryBox, 'move');
+    setupModalDraggable(lotteryModal, lotteryModal, 'pointer');
+    setupModalInteractions(lotteryModal);
+    setupRotatableAndClick(cubeScene, cube);
+    setupConfirmationModal();
+
+});
+</script>
